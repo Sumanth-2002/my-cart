@@ -146,7 +146,7 @@ public class MongoRoute extends RouteBuilder {
                     }
 
                     // Validate stock details
-                    if (item.getStockDetails() != null ) {
+                    if (item.getStockDetails() != null) {
                         if (item.getStockDetails().getAvailableStock() < 0) {
                             errors.put("availableStock", "Available stock cannot be negative");
                         }
@@ -188,13 +188,15 @@ public class MongoRoute extends RouteBuilder {
                 .setBody(simple("{\"status\": \"error\", \"message\": \"Category ${exchangeProperty.item.categoryId} does not exist\"}"))
                 .stop()
                 .otherwise()
+                // Insert item and pass the same data as response
                 .setBody(simple("${exchangeProperty.item}"))
                 .to("mongodb:myDb?database=cart&collection=item&operation=insert")
                 .setHeader(Exchange.HTTP_RESPONSE_CODE, constant(201))
-                .setBody(simple("{\"status\": \"success\", \"message\": \"Item created successfully\", \"itemId\": '${exchangeProperty.item.get_id()}'}"))
+                .log("Item inserted successfully with ID: ${exchangeProperty.item.get_id()}")
                 .endChoice()
                 .endChoice()
                 .endChoice();
+
 
         from("direct:findItemsByCategoryId")
                 .routeId("findItemsByCategoryIdRoute")
