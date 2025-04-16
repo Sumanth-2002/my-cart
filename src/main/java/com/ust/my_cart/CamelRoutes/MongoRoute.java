@@ -1,14 +1,22 @@
 package com.ust.my_cart.CamelRoutes;
 
+import com.mongodb.client.MongoClient;
+import com.mongodb.client.MongoClients;
+import com.mongodb.client.MongoCollection;
+import com.mongodb.client.MongoDatabase;
 import com.mongodb.client.model.Filters;
 import com.mongodb.client.model.Updates;
 import com.ust.my_cart.Document.Category;
 import com.ust.my_cart.Document.Item;
 import com.ust.my_cart.Document.ItemPrice;
+import com.ust.my_cart.Dto.CategoryItemsResponse;
+import com.ust.my_cart.Dto.ItemDto;
+import com.ust.my_cart.ItemMapper;
 import org.apache.camel.Exchange;
 import org.apache.camel.builder.RouteBuilder;
 import org.apache.camel.model.dataformat.JsonLibrary;
 import org.apache.camel.model.rest.RestBindingMode;
+import org.bson.Document;
 import org.bson.conversions.Bson;
 import org.springframework.stereotype.Component;
 
@@ -121,18 +129,13 @@ public class MongoRoute extends RouteBuilder {
                 .process(exchange -> {
                     Item item = exchange.getIn().getBody(Item.class);
                     Map<String, String> errors = new HashMap<>();
-
-                    // Validate item structure
                     if (item == null || item.get_id() == null || item.get_id().trim().isEmpty()) {
                         errors.put("itemId", "Item ID is required and must not be empty");
                     }
-
-                    // Validate categoryId
                     if (item.getCategoryId() == null || item.getCategoryId().trim().isEmpty()) {
                         errors.put("categoryId", "Category ID is required and must not be empty");
                     }
 
-                    // Validate prices
                     ItemPrice itemPrice = item.getItemPrice();
                     if (itemPrice == null) {
                         errors.put("itemPrice", "Item price is required");
@@ -145,7 +148,6 @@ public class MongoRoute extends RouteBuilder {
                         }
                     }
 
-                    // Validate stock details
                     if (item.getStockDetails() != null) {
                         if (item.getStockDetails().getAvailableStock() < 0) {
                             errors.put("availableStock", "Available stock cannot be negative");
@@ -168,9 +170,9 @@ public class MongoRoute extends RouteBuilder {
                 .when(exchangeProperty("validationFailed").isEqualTo(true))
                 .stop()
                 .otherwise()
-                // Log Item ID before query
+
                 .log("Item ID: ${exchangeProperty.item.get_id()}")
-                // Check if item exists
+
                 .setHeader("CamelMongoDbCriteria", simple("{'_id': '${exchangeProperty.item.get_id()}'}"))
                 .to("mongodb:myDb?database=cart&collection=item&operation=findOneByQuery")
                 .choice()
@@ -179,7 +181,6 @@ public class MongoRoute extends RouteBuilder {
                 .setBody(simple("{\"status\": \"error\", \"message\": \"Item with ID ${exchangeProperty.item.get_id()} already exists\"}"))
                 .stop()
                 .otherwise()
-                // Validate category
                 .setHeader("CamelMongoDbCriteria", simple("{'_id': '${exchangeProperty.item.categoryId}'}"))
                 .to("mongodb:myDb?database=cart&collection=category&operation=findOneByQuery")
                 .choice()
@@ -188,7 +189,6 @@ public class MongoRoute extends RouteBuilder {
                 .setBody(simple("{\"status\": \"error\", \"message\": \"Category ${exchangeProperty.item.categoryId} does not exist\"}"))
                 .stop()
                 .otherwise()
-                // Insert item and pass the same data as response
                 .setBody(simple("${exchangeProperty.item}"))
                 .to("mongodb:myDb?database=cart&collection=item&operation=insert")
                 .setHeader(Exchange.HTTP_RESPONSE_CODE, constant(201))
@@ -196,7 +196,6 @@ public class MongoRoute extends RouteBuilder {
                 .endChoice()
                 .endChoice()
                 .endChoice();
-
 
         from("direct:findItemsByCategoryId")
                 .routeId("findItemsByCategoryIdRoute")
@@ -215,22 +214,53 @@ public class MongoRoute extends RouteBuilder {
                         }
                     }
 
-
                     exchange.getIn().setHeader("CamelMongoDbCriteria", query);
                 })
-                .log("Mongo Query: ${header.CamelMongoDbCriteria}")
                 .to("mongodb:myDb?database=cart&collection=item&operation=findAll")
-                .log("Items fetched: ${body}");
+                .process(exchange -> {
+                    List<Document> items = exchange.getIn().getBody(List.class);
+                    String categoryId = exchange.getIn().getHeader("categoryid", String.class);
 
+                    MongoClient mongoClient = MongoClients.create();
+                    MongoDatabase database = mongoClient.getDatabase("cart");
+
+                    MongoCollection<Document> categoryCollection = database.getCollection("category");
+                    Document categoryDoc = categoryCollection.find(new Document("_id", categoryId)).first();
+
+                    String categoryName = categoryDoc != null ? categoryDoc.getString("categoryName") : null;
+                    String categoryDepartment = categoryDoc != null ? categoryDoc.getString("categoryDepartment") : null;
+
+                    for (Document item : items) {
+                        item.put("categoryName", categoryName);
+                    }
+
+                    ItemMapper itemMapper = new ItemMapper();
+                    List<ItemDto> itemDtos = itemMapper.mapToItemDtoList(items);
+
+                    CategoryItemsResponse response = new CategoryItemsResponse();
+                    response.setCategoryName(categoryName);
+                    response.setCategoryDepartment(categoryDepartment);
+                    response.setItems(itemDtos);
+
+                    exchange.getIn().setBody(response);
+                })
+                .log("Final enriched category + items response: ${body}");
 
         from("direct:findAllItems")
+                .routeId("findAllItemsRoute")
                 .log("Fetching all items")
-                .to("mongodb:myDb?database=cart&collection=item&operation=findAll");
+                .to("mongodb:myDb?database=cart&collection=item&operation=findAll")
+                .bean(ItemMapper.class, "mapToItemDtoList") // converts list of docs
+                .log("Mapped ItemDtos: ${body}");
 
         from("direct:findItemById")
+                .routeId("findItemByIdRoute")
                 .log("Fetching item by ID: ${header.id}")
                 .setBody(simple("{ '_id': '${header.id}' }"))
-                .to("mongodb:myDb?database=cart&collection=item&operation=findOneByQuery");
+                .to("mongodb:myDb?database=cart&collection=item&operation=findOneByQuery")
+                .bean(ItemMapper.class, "mapToItemDto")
+                .log("Mapped ItemDto: ${body}");
+
         rest("/inventory")
                 .post()
                 .consumes("application/json")
@@ -293,14 +323,12 @@ public class MongoRoute extends RouteBuilder {
                         int availableStock = ((Number) stockDetails.getOrDefault("availableStock", 0)).intValue();
 
                         if (availableStock < totalReduction) {
-                            errors.add(String.format("Insufficient stock for item %s: availableStock=%d, requested reduction=%d",
+                            errors.add(String.format("Insufficient stock for item %s: availableStock=%d, sold out and damaged =%d",
                                     itemId, availableStock, totalReduction));
                         } else {
 
                             Bson updateQuery = Updates.inc("stockDetails.availableStock", -totalReduction);
                             Bson criteria = Filters.eq("_id", itemId);
-
-                            // Store the update operation
                             Map<String, Object> updateOp = new HashMap<>();
                             updateOp.put("criteria", criteria);
                             updateOp.put("updateQuery", updateQuery);
