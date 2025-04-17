@@ -1,4 +1,4 @@
-package com.ust.my_cart.Document;
+package com.ust.my_cart.Model;
 
 import com.fasterxml.jackson.annotation.JsonProperty;
 import lombok.AllArgsConstructor;

@@ -3,8 +3,8 @@ package com.ust.my_cart.Dto;
 //import com.ust.my_cart.Document.ItemPrice;
 
 
-import com.ust.my_cart.Document.ItemPrice;
-import com.ust.my_cart.Document.StockDetails;
+import com.ust.my_cart.Model.ItemPrice;
+import com.ust.my_cart.Model.StockDetails;
 import lombok.AllArgsConstructor;
 import lombok.NoArgsConstructor;
 

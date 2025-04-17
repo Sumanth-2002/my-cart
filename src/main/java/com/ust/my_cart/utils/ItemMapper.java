@@ -1,7 +1,7 @@
-package com.ust.my_cart;
+package com.ust.my_cart.utils;
 
-import com.ust.my_cart.Document.ItemPrice;
-import com.ust.my_cart.Document.StockDetails;
+import com.ust.my_cart.Model.ItemPrice;
+import com.ust.my_cart.Model.StockDetails;
 import com.ust.my_cart.Dto.ItemDto;
 import org.bson.Document;
 import org.springframework.stereotype.Component;

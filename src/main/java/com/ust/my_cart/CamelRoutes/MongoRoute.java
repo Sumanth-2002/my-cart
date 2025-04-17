@@ -6,12 +6,12 @@ import com.mongodb.client.MongoCollection;
 import com.mongodb.client.MongoDatabase;
 import com.mongodb.client.model.Filters;
 import com.mongodb.client.model.Updates;
-import com.ust.my_cart.Document.Category;
-import com.ust.my_cart.Document.Item;
-import com.ust.my_cart.Document.ItemPrice;
+import com.ust.my_cart.Model.Category;
+import com.ust.my_cart.Model.Item;
+import com.ust.my_cart.Model.ItemPrice;
 import com.ust.my_cart.Dto.CategoryItemsResponse;
 import com.ust.my_cart.Dto.ItemDto;
-import com.ust.my_cart.ItemMapper;
+import com.ust.my_cart.utils.ItemMapper;
 import org.apache.camel.Exchange;
 import org.apache.camel.builder.RouteBuilder;
 import org.apache.camel.model.dataformat.JsonLibrary;
@@ -60,7 +60,6 @@ public class MongoRoute extends RouteBuilder {
 
         from("direct:insertCategory")
                 .routeId("insertCategoryRoute")
-                .log("Received category to insert: ${body}")
                 .setProperty("categoryBody", body())
 
                 .process(exchange -> {
@@ -85,7 +84,6 @@ public class MongoRoute extends RouteBuilder {
 
                 .choice()
                 .when(body().isNull())
-                .log("Category not found. Inserting.")
                 .setBody(exchangeProperty("categoryBody"))
                 .to("mongodb:myDb?database=cart&collection=category&operation=insert")
                 .setBody(exchangeProperty("categoryBody"))
@@ -98,19 +96,17 @@ public class MongoRoute extends RouteBuilder {
                 .end();
 
         from("direct:findAllCategories")
-                .log("Fetching all categories")
                 .to("mongodb:myDb?database=cart&collection=category&operation=findAll");
 
         from("direct:findCategoryById")
-                .log("Fetching category by ID: ${header.id}")
                 .process(exchange -> {
                     String categoryId = exchange.getIn().getHeader("id", String.class);
                     String query = "{ \"_id\": \"" + categoryId + "\" }";
 
                     exchange.getIn().setHeader("CamelMongoDbCriteria", query);
                 })
-                .to("mongodb:myDb?database=cart&collection=category&operation=findOneByQuery")
-                .log("Category fetched: ${body}");
+                .to("mongodb:myDb?database=cart&collection=category&operation=findOneByQuery");
+
 
         rest("/item")
                 .post()
@@ -125,7 +121,7 @@ public class MongoRoute extends RouteBuilder {
 
         from("direct:insertItem")
                 .routeId("createItemRoute")
-                .log("Received item to insert: ${body}")
+
                 .process(exchange -> {
                     Item item = exchange.getIn().getBody(Item.class);
                     Map<String, String> errors = new HashMap<>();
@@ -171,8 +167,6 @@ public class MongoRoute extends RouteBuilder {
                 .stop()
                 .otherwise()
 
-                .log("Item ID: ${exchangeProperty.item.get_id()}")
-
                 .setHeader("CamelMongoDbCriteria", simple("{'_id': '${exchangeProperty.item.get_id()}'}"))
                 .to("mongodb:myDb?database=cart&collection=item&operation=findOneByQuery")
                 .choice()
@@ -192,14 +186,14 @@ public class MongoRoute extends RouteBuilder {
                 .setBody(simple("${exchangeProperty.item}"))
                 .to("mongodb:myDb?database=cart&collection=item&operation=insert")
                 .setHeader(Exchange.HTTP_RESPONSE_CODE, constant(201))
-                .log("Item inserted successfully with ID: ${exchangeProperty.item.get_id()}")
+
                 .endChoice()
                 .endChoice()
                 .endChoice();
 
         from("direct:findItemsByCategoryId")
                 .routeId("findItemsByCategoryIdRoute")
-                .log("Fetching items for category ID: ${header.categoryid}, includeSpecial: ${header.includeSpecial}")
+
                 .process(exchange -> {
                     String categoryId = exchange.getIn().getHeader("categoryid", String.class);
                     String includeSpecial = exchange.getIn().getHeader("includeSpecial", String.class);
@@ -243,37 +237,117 @@ public class MongoRoute extends RouteBuilder {
                     response.setItems(itemDtos);
 
                     exchange.getIn().setBody(response);
-                })
-                .log("Final enriched category + items response: ${body}");
+                });
 
         from("direct:findAllItems")
                 .routeId("findAllItemsRoute")
-                .log("Fetching all items")
+
                 .to("mongodb:myDb?database=cart&collection=item&operation=findAll")
-                .bean(ItemMapper.class, "mapToItemDtoList") // converts list of docs
-                .log("Mapped ItemDtos: ${body}");
+                .bean(ItemMapper.class, "mapToItemDtoList");
 
         from("direct:findItemById")
                 .routeId("findItemByIdRoute")
-                .log("Fetching item by ID: ${header.id}")
+
                 .setBody(simple("{ '_id': '${header.id}' }"))
                 .to("mongodb:myDb?database=cart&collection=item&operation=findOneByQuery")
-                .bean(ItemMapper.class, "mapToItemDto")
-                .log("Mapped ItemDto: ${body}");
+                .bean(ItemMapper.class, "mapToItemDto");
 
         rest("/inventory")
                 .post()
                 .consumes("application/json")
                 .to("direct:updateInventory");
 
+//        from("direct:updateInventory")
+//                .routeId("updateInventoryRoute")
+//                .process(exchange -> {
+//                    Map<String, Object> payload = exchange.getIn().getBody(Map.class);
+//                    List<List<Map<String, Object>>> itemsWrapper = (List<List<Map<String, Object>>>) payload.get("items");
+//                    List<Map<String, Object>> items = itemsWrapper.get(0);
+//                    List<String> errors = new ArrayList<>();
+//                    List<Map<String, Object>> updates = new ArrayList<>();
+//                    exchange.setProperty("errors", errors);
+//                    exchange.setProperty("updates", updates);
+//
+//                    exchange.getIn().setBody(items);
+//                })
+//                .split(body())
+//                .process(exchange -> {
+//
+//                    Map<String, Object> item = exchange.getIn().getBody(Map.class);
+//                    List<String> errors = exchange.getProperty("errors", List.class);
+//                    List<Map<String, Object>> updates = exchange.getProperty("updates", List.class);
+//
+//                    if (item != null) {
+//
+//                        String itemId = (String) item.get("_id");
+//                        Map<String, Object> stockDetails = (Map<String, Object>) item.get("stockDetails");
+//
+//                        int soldOut = Integer.parseInt((String) stockDetails.getOrDefault("soldOut", "0"));
+//                        int damaged = Integer.parseInt((String) stockDetails.getOrDefault("damaged", "0"));
+//                        int totalReduction = soldOut + damaged;
+//
+//                        Bson criteria = Filters.eq("_id", itemId);
+//                        exchange.getIn().setHeader("CamelMongoDbCriteria", criteria);
+//                        exchange.getIn().setHeader("CamelMongoDbOperation", "findOneByQuery");
+//
+//                        exchange.setProperty("itemId", itemId);
+//                        exchange.setProperty("totalReduction", totalReduction);
+//                    } else {
+//                        errors.add("Item is null in the input payload");
+//                    }
+//                })
+//                .to("mongodb:myDb?database=cart&collection=item&operation=findOneByQuery")
+//                .process(exchange -> {
+//
+//                    Map<String, Object> document = exchange.getIn().getBody(Map.class);
+//                    String itemId = exchange.getProperty("itemId", String.class);
+//                    int totalReduction = exchange.getProperty("totalReduction", Integer.class);
+//                    List<String> errors = exchange.getProperty("errors", List.class);
+//                    List<Map<String, Object>> updates = exchange.getProperty("updates", List.class);
+//
+//                    if (document != null) {
+//                        Map<String, Object> stockDetails = (Map<String, Object>) document.get("stockDetails");
+//                        int availableStock = ((Number) stockDetails.getOrDefault("availableStock", 0)).intValue();
+//
+//                        if (availableStock < totalReduction) {
+//                            errors.add(String.format("Insufficient stock for item %s: availableStock=%d, sold out and damaged =%d",
+//                                    itemId, availableStock, totalReduction));
+//                        } else {
+//
+//                            Bson updateQuery = Updates.inc("stockDetails.availableStock", -totalReduction);
+//                            Bson criteria = Filters.eq("_id", itemId);
+//                            Map<String, Object> updateOp = new HashMap<>();
+//                            updateOp.put("criteria", criteria);
+//                            updateOp.put("updateQuery", updateQuery);
+//                            updates.add(updateOp);
+//                        }
+//                    } else {
+//                        errors.add("Item not found in database: " + itemId);
+//                    }
+//                })
+//                .end()
+//                .process(exchange -> {
+//                    List<String> errors = exchange.getProperty("errors", List.class);
+//                    if (!errors.isEmpty()) {
+//                        String errorMessage = "Validation errors: " + String.join("; ", errors);
+//                        throw new IllegalArgumentException(errorMessage);
+//                    }
+//                })
+//                .split(simple("${exchangeProperty.updates}"))
+//                .process(exchange -> {
+//                    Map<String, Object> updateOp = exchange.getIn().getBody(Map.class);
+//                    exchange.getIn().setHeader("CamelMongoDbCriteria", updateOp.get("criteria"));
+//                    exchange.getIn().setHeader("CamelMongoDbOperation", "update");
+//                    exchange.getIn().setBody(updateOp.get("updateQuery"));
+//                })
+//                .to("mongodb:myDb?database=cart&collection=item&operation=update")
+//                .end();
+
         from("direct:updateInventory")
                 .routeId("updateInventoryRoute")
-                .log("Received inventory payload: ${body}")
                 .process(exchange -> {
-
                     Map<String, Object> payload = exchange.getIn().getBody(Map.class);
-                    List<List<Map<String, Object>>> itemsWrapper = (List<List<Map<String, Object>>>) payload.get("items");
-                    List<Map<String, Object>> items = itemsWrapper.get(0);
+                    List<Map<String, Object>> items = (List<Map<String, Object>>) payload.get("items");
 
                     List<String> errors = new ArrayList<>();
                     List<Map<String, Object>> updates = new ArrayList<>();
@@ -284,16 +358,13 @@ public class MongoRoute extends RouteBuilder {
                 })
                 .split(body())
                 .process(exchange -> {
-
                     Map<String, Object> item = exchange.getIn().getBody(Map.class);
                     List<String> errors = exchange.getProperty("errors", List.class);
                     List<Map<String, Object>> updates = exchange.getProperty("updates", List.class);
 
                     if (item != null) {
-
                         String itemId = (String) item.get("_id");
                         Map<String, Object> stockDetails = (Map<String, Object>) item.get("stockDetails");
-
 
                         int soldOut = Integer.parseInt((String) stockDetails.getOrDefault("soldOut", "0"));
                         int damaged = Integer.parseInt((String) stockDetails.getOrDefault("damaged", "0"));
@@ -311,7 +382,6 @@ public class MongoRoute extends RouteBuilder {
                 })
                 .to("mongodb:myDb?database=cart&collection=item&operation=findOneByQuery")
                 .process(exchange -> {
-
                     Map<String, Object> document = exchange.getIn().getBody(Map.class);
                     String itemId = exchange.getProperty("itemId", String.class);
                     int totalReduction = exchange.getProperty("totalReduction", Integer.class);
@@ -323,16 +393,13 @@ public class MongoRoute extends RouteBuilder {
                         int availableStock = ((Number) stockDetails.getOrDefault("availableStock", 0)).intValue();
 
                         if (availableStock < totalReduction) {
-                            errors.add(String.format("Insufficient stock for item %s: availableStock=%d, sold out and damaged =%d",
+                            errors.add(String.format("Insufficient stock for item %s: availableStock=%d, sold out and damaged=%d",
                                     itemId, availableStock, totalReduction));
                         } else {
-
-                            Bson updateQuery = Updates.inc("stockDetails.availableStock", -totalReduction);
-                            Bson criteria = Filters.eq("_id", itemId);
-                            Map<String, Object> updateOp = new HashMap<>();
-                            updateOp.put("criteria", criteria);
-                            updateOp.put("updateQuery", updateQuery);
-                            updates.add(updateOp);
+                            Map<String, Object> updatePayload = new HashMap<>();
+                            updatePayload.put("_id", itemId);
+                            updatePayload.put("totalReduction", totalReduction);
+                            updates.add(updatePayload);
                         }
                     } else {
                         errors.add("Item not found in database: " + itemId);
@@ -347,13 +414,36 @@ public class MongoRoute extends RouteBuilder {
                     }
                 })
                 .split(simple("${exchangeProperty.updates}"))
+                .marshal().json(JsonLibrary.Jackson)
+                .to("activemq:queue:inventory.update.queue")
+                .end()
                 .process(exchange -> {
-                    Map<String, Object> updateOp = exchange.getIn().getBody(Map.class);
-                    exchange.getIn().setHeader("CamelMongoDbCriteria", updateOp.get("criteria"));
+                    Map<String, Object> response = new HashMap<>();
+                    response.put("status", "success");
+                    response.put("message", "Stock update operations queued successfully");
+                    exchange.getIn().setBody(response);
+                });
+//                .log("Returning response: ${body}");
+        from("activemq:queue:inventory.update.queue")
+                .routeId("inventoryAsyncUpdater")
+                .threads(10)
+                .unmarshal().json(JsonLibrary.Jackson, Map.class)
+                .process(exchange -> {
+                    Map<String, Object> updatePayload = exchange.getIn().getBody(Map.class);
+                    String itemId = (String) updatePayload.get("_id");
+                    int totalReduction = (Integer) updatePayload.get("totalReduction");
+
+                    Bson criteria = Filters.eq("_id", itemId);
+                    Bson updateQuery = Updates.inc("stockDetails.availableStock", -totalReduction);
+
+                    exchange.getIn().setHeader("CamelMongoDbCriteria", criteria);
                     exchange.getIn().setHeader("CamelMongoDbOperation", "update");
-                    exchange.getIn().setBody(updateOp.get("updateQuery"));
+                    exchange.getIn().setBody(updateQuery);
                 })
+                .log("Dequeued for async processing: ${body}")
                 .to("mongodb:myDb?database=cart&collection=item&operation=update")
-                .end();
+                .log("Stock updated asynchronously for item: ${body}");
+
+
     }
 }
