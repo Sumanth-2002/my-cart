@@ -1,12 +1,14 @@
 package com.ust.my_cart.Dto;
 
-import java.util.List;
+import com.fasterxml.jackson.annotation.JsonInclude;
 
+import java.util.List;
+@JsonInclude(JsonInclude.Include.NON_NULL)
 public class CategoryItemsResponse {
     private String categoryName;
     private String categoryDepartment;
     private List<ItemDto> items;
-
+    private String message;
     // Getters & Setters
     public String getCategoryName() {
         return categoryName;
@@ -30,5 +32,13 @@ public class CategoryItemsResponse {
 
     public void setItems(List<ItemDto> items) {
         this.items = items;
+    }
+
+    public String getMessage() {
+        return message;
+    }
+
+    public void setMessage(String message) {
+        this.message = message;
     }
 }

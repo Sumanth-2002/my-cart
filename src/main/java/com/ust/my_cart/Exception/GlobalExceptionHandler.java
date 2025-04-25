@@ -1,29 +1,30 @@
 package com.ust.my_cart.Exception;
 
-import org.springframework.http.HttpStatus;
-import org.springframework.http.ResponseEntity;
-import org.springframework.web.bind.annotation.ControllerAdvice;
-import org.springframework.web.bind.annotation.ExceptionHandler;
+import org.apache.camel.Exchange;
+import org.apache.camel.Processor;
+import org.springframework.stereotype.Component;
 
 import java.util.HashMap;
 import java.util.Map;
 
-@ControllerAdvice
-public class GlobalExceptionHandler {
+@Component
+public class GlobalExceptionHandler implements Processor {
+    @Override
+    public void process(Exchange exchange) {
+        Exception exception = exchange.getProperty(Exchange.EXCEPTION_CAUGHT, Exception.class);
+        int statusCode = 500;
+        String message = "Internal Server Error";
 
-    @ExceptionHandler(IllegalArgumentException.class)
-    public ResponseEntity<Map<String, Object>> handleIllegalArgumentException(IllegalArgumentException ex) {
-        Map<String, Object> body = new HashMap<>();
-        body.put("status", "error");
-        body.put("message", ex.getMessage());
-        return new ResponseEntity<>(body, HttpStatus.CONFLICT); // 409 Conflict
-    }
+        if (exception instanceof ProcessException) {
+            statusCode = ((ProcessException) exception).getStatusCode();
+            message = exception.getMessage();
+        }
 
-    @ExceptionHandler(Exception.class)
-    public ResponseEntity<Map<String, Object>> handleGenericException(Exception ex) {
-        Map<String, Object> body = new HashMap<>();
-        body.put("status", "error");
-        body.put("message", "An unexpected error occurred.");
-        return new ResponseEntity<>(body, HttpStatus.INTERNAL_SERVER_ERROR);
+        Map<String, Object> error = new HashMap<>();
+        error.put("status", "error");
+        error.put("message", message);
+
+        exchange.getMessage().setHeader(Exchange.HTTP_RESPONSE_CODE, statusCode);
+        exchange.getMessage().setBody(error);
     }
 }
