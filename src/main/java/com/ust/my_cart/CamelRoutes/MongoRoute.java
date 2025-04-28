@@ -114,7 +114,7 @@ public class MongoRoute extends RouteBuilder {
                 .process(itemProcessor::validateAndPrepareAsyncUpdate)
                 .split(body()).parallelProcessing()
                 .marshal().json(JsonLibrary.Jackson)
-                .to("activemq:queue:inventory.update.queue")
+                .to("activemq:queue:inventory.update.queue?exchangePattern=InOnly&deliveryMode=2")
                 .end();
 
 
