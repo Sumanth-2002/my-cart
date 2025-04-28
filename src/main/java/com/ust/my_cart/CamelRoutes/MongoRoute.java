@@ -112,18 +112,13 @@ public class MongoRoute extends RouteBuilder {
         from("direct:updateInventoryAsync")
                 .routeId("updateInventoryRouteAsync")
                 .process(itemProcessor::validateAndPrepareAsyncUpdate)
-                .split(body()).parallelProcessing()
+                .split(exchangeProperty("updates")).parallelProcessing()
                 .marshal().json(JsonLibrary.Jackson)
                 .to("activemq:queue:inventory.update.queue?exchangePattern=InOnly&deliveryMode=2")
-                .end();
+                .end()
+                .setBody(constant("Item details are queued for update successfully"));
 
 
-        from("activemq:queue:inventory.update.queue")
-                .routeId("inventoryAsyncUpdater")
-                .threads(10)
-                .unmarshal().json(JsonLibrary.Jackson, Map.class)
-                .process(mongoService::applySingleInventoryUpdate)
-                .log("Stock updated asynchronously for item: ${body}");
 
     }
 }

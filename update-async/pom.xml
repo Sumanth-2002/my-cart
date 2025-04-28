@@ -28,12 +28,35 @@
 	</scm>
 	<properties>
 		<java.version>17</java.version>
+		<camel.version>4.3.0</camel.version>
 	</properties>
+
 	<dependencies>
+
+		<dependency>
+			<groupId>org.springframework.boot</groupId>
+			<artifactId>spring-boot-starter-web</artifactId>
+		</dependency>
+		<dependency>
+			<groupId>org.springframework.boot</groupId>
+			<artifactId>spring-boot-starter-data-mongodb</artifactId>
+		</dependency>
+		<dependency>
+			<groupId>org.apache.camel</groupId>
+			<artifactId>camel-activemq</artifactId>
+			<version>4.3.0</version> <!-- Match your Camel version -->
+		</dependency>
+
 		<dependency>
 			<groupId>org.apache.camel.springboot</groupId>
 			<artifactId>camel-spring-boot-starter</artifactId>
-			<version>4.11.0</version>
+			<version>${camel.version}</version>
+		</dependency>
+		<!-- Use Servlet component instead of Restlet -->
+		<dependency>
+			<groupId>org.apache.camel.springboot</groupId>
+			<artifactId>camel-netty-http-starter</artifactId>
+			<version>4.3.0</version>
 		</dependency>
 
 		<dependency>
@@ -42,10 +65,21 @@
 			<optional>true</optional>
 		</dependency>
 		<dependency>
-			<groupId>org.springframework.boot</groupId>
-			<artifactId>spring-boot-starter-test</artifactId>
-			<scope>test</scope>
+			<groupId>org.apache.camel.springboot</groupId>
+			<artifactId>camel-mongodb-starter</artifactId>
+			<version>${camel.version}</version>
 		</dependency>
+		<dependency>
+			<groupId>org.apache.activemq</groupId>
+			<artifactId>activemq-broker</artifactId>
+			<version>5.18.2</version> <!-- or your version -->
+		</dependency>
+		<dependency>
+			<groupId>javax.jms</groupId>
+			<artifactId>javax.jms-api</artifactId>
+			<version>2.0.1</version> <!-- or 2.0.2 -->
+		</dependency>
+
 	</dependencies>
 
 	<build>

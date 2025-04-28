@@ -184,7 +184,7 @@ public class ItemProcessor {
         exchange.setProperty("updates", updates);
         exchange.setProperty("successfulUpdates", successfulUpdates);
         exchange.setProperty("errors", errors);
-        exchange.getIn().setBody(updates);
+//        exchange.getIn().setBody(updates);
     }
 
 
