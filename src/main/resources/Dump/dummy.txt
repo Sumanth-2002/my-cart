@@ -1,0 +1,53 @@
+MyCart.com - Item Distribution System via Local SFTP Simulation
+---------------------------------------------------------------
+
+Overview:
+---------
+MyCart.com has to support three third-party applications (all SaaS-based) by supplying item-related information in specific XML formats. These files are to be saved in separate folders (simulating SFTP), since actual SFTP is not available.
+
+Target Applications:
+--------------------
+1. Item Trend Analyzer       --> Needs item + stock + category in specific XML structure.
+2. Item Review Aggregator    --> Needs only reviews per item in XML.
+3. StoreFront App            --> Needs full item + category data for offline sync.
+
+Architecture:
+-------------
+1. **Scheduler Based Processing**:
+   - A Spring Boot scheduler runs at fixed intervals (e.g., every 1 hour).
+   - Reads last processed timestamp from MongoDB collection: `ControlRef`.
+   - Fetches items from the `item` collection where `lastUpdateTs > lastProcessTs`.
+
+2. **Parallel Processing**:
+   - For each item, three tasks are executed in parallel using `CompletableFuture` or `ExecutorService`:
+     a. Generate XML for Trend Analyzer → save to `/local/sftp/trend-analyzer/`
+     b. Generate XML for Review Aggregator → save to `/local/sftp/review-aggregator/`
+     c. Generate XML for StoreFront App → save to `/local/sftp/storefront/`
+
+3. **ControlRef Tracking**:
+   - After processing, update `ControlRef.lastProcessTs` with the current time.
+   - Ensures that future runs only fetch newly updated items.
+
+4. **Folder Structure (Local Simulation of SFTP)**:
+   - `/local/sftp/trend-analyzer/`
+   - `/local/sftp/review-aggregator/`
+   - `/local/sftp/storefront/`
+
+5. **Validation and Logging**:
+   - Validate XML against XSD schema before saving.
+   - Log success and failure for each item-process in logs or a Mongo collection.
+
+Technology Stack:
+-----------------
+- Spring Boot (Scheduler + Service Layer)
+- MongoDB (Item, Category, ControlRef)
+- JAXB (for XML generation from objects)
+- Java Executors / CompletableFuture (for parallelism)
+- Java NIO or FileWriter (to save files locally)
+
+Benefits:
+---------
+- Efficient & scalable data distribution.
+- Loose coupling between core and third-party apps.
+- Easily switch to real SFTP by changing file-saving strategy.
+

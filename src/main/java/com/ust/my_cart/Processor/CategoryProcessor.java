@@ -1,12 +1,16 @@
 package com.ust.my_cart.Processor;
 
+import com.mongodb.client.model.Filters;
 import com.ust.my_cart.Exception.ProcessException;
 import com.ust.my_cart.Model.Category;
+import com.ust.my_cart.Model.Item;
 import com.ust.my_cart.utils.MongoService;
 import org.apache.camel.Exchange;
 import org.apache.camel.Processor;
 import org.bson.Document;
+import org.bson.conversions.Bson;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.data.mongodb.core.MongoTemplate;
 import org.springframework.data.mongodb.core.query.BasicQuery;
 import org.springframework.stereotype.Component;
 
@@ -15,10 +19,14 @@ import java.util.Map;
 @Component
 public class CategoryProcessor {
     private final MongoService mongoService;
+
     @Autowired
-     public CategoryProcessor(MongoService mongoService) {
+    public CategoryProcessor(MongoService mongoService) {
         this.mongoService = mongoService;
     }
+
+    @Autowired
+    private MongoTemplate mongoTemplate;
 
     public Processor findCategoryByIdProcessor() {
         return exchange -> {
@@ -26,35 +34,24 @@ public class CategoryProcessor {
             if (categoryId == null || categoryId.trim().isEmpty()) {
                 throw new ProcessException("Missing required header: id", 400);
             }
-
-            Document category = mongoService.findCategoryById(categoryId);
-            if (category == null) {
-                throw new ProcessException("Category with ID " + categoryId + " not found", 404);
-            }
-
-            exchange.getIn().setBody(category);
+            Bson filter = Filters.eq("_id", categoryId);
+            exchange.getIn().setBody(filter);
         };
     }
-    public Processor insertCategoryProcessor() {
-        return exchange -> {
-            Category category = exchange.getIn().getBody(Category.class);
 
-            if (category.get_id() == null || category.get_id().trim().isEmpty()) {
-                throw new ProcessException("Category _id is required", 400);
-            }
+    public void insertCategoryProcessor(Exchange exchange) {
+        Category category = exchange.getIn().getBody(Category.class);
 
-            Document existingCategory = mongoService.findCategoryById(category.get_id());
-            if (existingCategory != null) {
-                throw new ProcessException("Category with this ID already exists", 409);
-            }
+        if (category.get_id() == null || category.get_id().trim().isEmpty()) {
+            throw new ProcessException("Category _id is required", 400);
+        }
 
-            mongoService.insertCategory(category);
-            exchange.getIn().setHeader(Exchange.HTTP_RESPONSE_CODE, 201);
-            exchange.getIn().setBody(Map.of(
-                    "status", "success",
-                    "message", "Category inserted successfully"
-            ));
-        };
+
+        if (mongoTemplate.findById(category.get_id(), Category.class, "category") != null) {
+            throw new ProcessException("Category with this ID already exists", 409);
+        }
+
+
     }
 
 

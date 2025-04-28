@@ -1,4 +1,4 @@
-package com.ust.my_cart.Dummy;
+package com.ust.my_cart.utils;
 
 
 public class MongoConstants {

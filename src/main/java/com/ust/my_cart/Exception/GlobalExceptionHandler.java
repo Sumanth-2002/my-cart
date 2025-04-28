@@ -14,12 +14,10 @@ public class GlobalExceptionHandler implements Processor {
         Exception exception = exchange.getProperty(Exchange.EXCEPTION_CAUGHT, Exception.class);
         int statusCode = 500;
         String message = "Internal Server Error";
-
         if (exception instanceof ProcessException) {
             statusCode = ((ProcessException) exception).getStatusCode();
             message = exception.getMessage();
         }
-
         Map<String, Object> error = new HashMap<>();
         error.put("status", "error");
         error.put("message", message);

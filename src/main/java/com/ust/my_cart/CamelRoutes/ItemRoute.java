@@ -1,54 +1,40 @@
 //package com.ust.my_cart.CamelRoutes;
 //
-//import com.mongodb.client.MongoClient;
-//import com.mongodb.client.MongoClients;
-//import com.mongodb.client.MongoCollection;
-//import com.mongodb.client.MongoDatabase;
-//import com.mongodb.client.model.Filters;
-//import com.mongodb.client.model.Updates;
+//import com.ust.my_cart.utils.MongoConstants;
+//import com.ust.my_cart.utils.ItemMapper.ResponseHelper;
 //import com.ust.my_cart.Exception.GlobalExceptionHandler;
 //import com.ust.my_cart.Model.Category;
 //import com.ust.my_cart.Model.Item;
-//import com.ust.my_cart.Dto.CategoryItemsResponse;
-//import com.ust.my_cart.Dto.ItemDto;
 //import com.ust.my_cart.Processor.CategoryProcessor;
-//import com.ust.my_cart.Dummy.CategoryRouteProcessor;
 //import com.ust.my_cart.Processor.ItemProcessor;
-//import com.ust.my_cart.Dummy.ItemRouteProcessor;
 //import com.ust.my_cart.utils.ItemMapper;
-//import com.ust.my_cart.Dummy.MongoConstants;
 //import com.ust.my_cart.utils.MongoService;
-//import com.ust.my_cart.Dummy.ResponseHelper;
 //import org.apache.camel.Exchange;
 //import org.apache.camel.builder.RouteBuilder;
 //import org.apache.camel.model.dataformat.JsonLibrary;
 //import org.apache.camel.model.rest.RestBindingMode;
-//import org.bson.Document;
-//import org.bson.conversions.Bson;
 //import org.springframework.beans.factory.annotation.Autowired;
 //import org.springframework.stereotype.Component;
 //
-//import java.util.ArrayList;
-//import java.util.HashMap;
-//import java.util.List;
+//
 //import java.util.Map;
 //
 //@Component
-//public class ItemRoute extends RouteBuilder {
+//public class MongoRoute extends RouteBuilder {
 //    @Autowired
-//    private ItemRouteProcessor itemProcessor;
+//    private ItemProcessor itemProcessor;
 //    @Autowired
-//    private ResponseHelper responseHelper;
-//    @Autowired
-//    private CategoryRouteProcessor categoryProcessor;
+//    private CategoryProcessor categoryProcessor;
 //    @Autowired
 //    private GlobalExceptionHandler globalExceptionHandler;
 //    @Autowired
 //    private MongoService mongoService;
+//    @Autowired
+//    private ResponseHelper responseHelper;
 //
 //    @Override
 //    public void configure() throws Exception {
-//        onException(Exception.class).handled(true).process(globalExceptionHandler).end();
+////        onException(Exception.class).handled(true).process(globalExceptionHandler).end();
 //        restConfiguration()
 //                .component("netty-http")
 //                .host("0.0.0.0")
@@ -68,15 +54,13 @@
 //
 //        from("direct:insertCategory")
 //                .routeId("insertCategoryRoute")
-//                .process(categoryProcessor.insertCategoryProcessor())
-//                .to(MongoConstants.SAVE_CATEGORY)
-//        ;
-//
+//                .process(categoryProcessor.insertCategoryProcessor());
+////                .to(MongoConstants.SAVE_CATEGORY).process(responseHelper.categorySuccessResponse());
 //        from("direct:findAllCategories")
 //                .bean(mongoService, "findAllCategories");
 //        from("direct:findCategoryById")
-////                .process(categoryProcessor.findCategoryByIdProcessor());
-//                .to(MongoConstants.FIND_CATEGORY_BY_ID);
+//                .process(categoryProcessor.findCategoryByIdProcessor());
+//
 //
 //        rest("/item")
 //                .post()
@@ -91,7 +75,8 @@
 //
 //        from("direct:insertItem")
 //                .routeId("createItemRoute")
-//                .process(itemProcessor.createItemProcessor());
+//                .bean(ItemProcessor.class, "createItemProcessor")
+//                .setHeader(Exchange.HTTP_RESPONSE_CODE, constant(201));
 //
 //        from("direct:findItemsByCategoryId")
 //                .routeId("findItemsByCategoryIdRoute")

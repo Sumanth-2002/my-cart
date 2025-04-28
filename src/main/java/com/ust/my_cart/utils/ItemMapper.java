@@ -8,6 +8,7 @@ import org.springframework.stereotype.Component;
 
 import java.util.ArrayList;
 import java.util.List;
+
 @Component
 public class ItemMapper {
 
@@ -32,7 +33,6 @@ public class ItemMapper {
         dto.setCategoryName(doc.getString("categoryId")); // can be replaced with enriched name
         dto.setSpecialProduct(doc.getBoolean("specialProduct", false));
 
-        // itemPrice
         Document priceDoc = doc.get("itemPrice", Document.class);
         if (priceDoc != null) {
             ItemPrice price = new ItemPrice();
@@ -54,5 +54,6 @@ public class ItemMapper {
 
         return dto;
     }
+
 }
 

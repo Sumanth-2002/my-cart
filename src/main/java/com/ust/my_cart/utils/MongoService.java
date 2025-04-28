@@ -12,6 +12,8 @@ import org.springframework.stereotype.Component;
 import com.fasterxml.jackson.databind.ObjectMapper;
 
 import java.io.IOException;
+import java.time.LocalDateTime;
+import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
@@ -28,21 +30,9 @@ public class MongoService {
         this.database = mongoClient.getDatabase("cart");
         this.objectMapper = new ObjectMapper();
     }
-
-    public void insertItem(Item item) {
-        MongoCollection<Document> itemCollection = database.getCollection("item");
-        Document itemDoc = convertToDocument(item);
-        itemCollection.insertOne(itemDoc);
-    }
-
-    public List<Document> findItemsByQuery(String query) {
-        MongoCollection<Document> itemCollection = database.getCollection("item");
-        return itemCollection.find(Document.parse(query)).into(new ArrayList<>());
-    }
-
-    public Document findCategoryById(String categoryId) {
-        MongoCollection<Document> categoryCollection = database.getCollection("category");
-        return categoryCollection.find(new Document("_id", categoryId)).first();
+    private String formatDate(LocalDateTime dateTime) {
+        DateTimeFormatter formatter = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss");
+        return dateTime.format(formatter);
     }
 
     private Document convertToDocument(Item item) {
@@ -53,28 +43,10 @@ public class MongoService {
             throw new RuntimeException("Error converting Item to Document", e);
         }
     }
-    public List<Document> findAllItems() {
-        MongoCollection<Document> itemCollection = database.getCollection("item");
-        return itemCollection.find().into(new ArrayList<>());
-    }
 
     public Document findItemById(String id) {
         MongoCollection<Document> itemCollection = database.getCollection("item");
         return itemCollection.find(new Document("_id", id)).first();
-    }
-    public List<Document> findAllCategories() {
-        MongoCollection<Document> categoryCollection = database.getCollection("category");
-        return categoryCollection.find().into(new ArrayList<>());
-    }
-    public void insertCategory(Category category) {
-        MongoCollection<Document> collection = database.getCollection("category");
-        Document doc = new Document()
-                .append("_id", category.get_id())
-                .append("categoryName", category.getCategoryName())
-                .append("categoryDep", category.getCategoryDep())
-                .append("categoryTax",category.getCategoryTax());
-
-        collection.insertOne(doc);
     }
     public void applyInventoryUpdates(Exchange exchange) {
         List<Map<String, Object>> updates = exchange.getProperty("updates", List.class);
@@ -95,24 +67,23 @@ public class MongoService {
                 ));
                 continue;
             }
-
             Document stockDetails = (Document) item.get("stockDetails");
             int availableStock = stockDetails.getInteger("availableStock", 0);
-
             if (availableStock < totalReduction) {
                 errors.add(Map.of(
                         "itemId", itemId,
-                        "error", String.format("Insufficient stock: available=%d, reduce=%d", availableStock, totalReduction)
+                        "error", String.format("Update Failed ,Insufficient stock")
                 ));
                 continue;
             }
 
             itemCollection.updateOne(
                     Filters.eq("_id", itemId),
-                    Updates.inc("stockDetails.availableStock", -totalReduction)
+                    Updates.combine(
+                            Updates.inc("stockDetails.availableStock", -totalReduction),
+                            Updates.set("lastUpdateDate", formatDate(LocalDateTime.now()))  // Automatically set lastUpdateDate
+                    )
             );
-
-
             Document updatedItem = itemCollection.find(Filters.eq("_id", itemId)).first();
             Document updatedStockDetails = (Document) updatedItem.get("stockDetails");
             int updatedStock = updatedStockDetails.getInteger("availableStock", 0);
@@ -131,12 +102,12 @@ public class MongoService {
         int totalReduction = (Integer) updatePayload.get("totalReduction");
 
         Bson criteria = Filters.eq("_id", itemId);
-        Bson updateQuery = Updates.inc("stockDetails.availableStock", -totalReduction);
+        Bson updateQuery = Updates.combine(
+                Updates.inc("stockDetails.availableStock", -totalReduction),
+                Updates.set("lastUpdateDate", formatDate(LocalDateTime.now()))  // Automatically set lastUpdateDate
+        );
 
         MongoCollection<Document> itemCollection = database.getCollection("item");
         itemCollection.updateOne(criteria, updateQuery);
     }
-
-
-
 }

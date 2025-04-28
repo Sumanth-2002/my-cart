@@ -1,19 +1,24 @@
 package com.ust.my_cart.Model;
 
+import com.fasterxml.jackson.annotation.JsonFormat;
 import com.fasterxml.jackson.annotation.JsonInclude;
 import com.fasterxml.jackson.annotation.JsonProperty;
 import lombok.AllArgsConstructor;
 import lombok.NoArgsConstructor;
-import org.springframework.data.annotation.Id;
+import org.springframework.data.annotation.CreatedDate;
+import org.springframework.data.annotation.LastModifiedDate;
 import org.springframework.data.mongodb.core.mapping.Field;
 
+import java.time.LocalDateTime;
+import java.time.format.DateTimeFormatter;
 import java.util.List;
+
 @JsonInclude(JsonInclude.Include.NON_EMPTY)
 @AllArgsConstructor
 @NoArgsConstructor
 public class Item {
+
     @Field("_id")
-    @Id
     @JsonProperty("_id")
     private String _id;
 
@@ -24,6 +29,7 @@ public class Item {
     private String categoryId;
 
     @JsonProperty("lastUpdateDate")
+    @JsonFormat(pattern = "yyyy-MM-dd HH:mm:ss")
     private String lastUpdateDate;
 
     @JsonProperty("itemPrice")
@@ -70,6 +76,7 @@ public class Item {
         this.lastUpdateDate = lastUpdateDate;
     }
 
+
     public ItemPrice getItemPrice() {
         return itemPrice;
     }
@@ -101,7 +108,9 @@ public class Item {
     public void setReview(List<Review> review) {
         this.review = review;
     }
+
 }
+
 
 class Review {
 
