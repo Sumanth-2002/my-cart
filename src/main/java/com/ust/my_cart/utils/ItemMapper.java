@@ -1,5 +1,6 @@
 package com.ust.my_cart.utils;
 
+import com.ust.my_cart.Exception.ProcessException;
 import com.ust.my_cart.Model.ItemPrice;
 import com.ust.my_cart.Model.StockDetails;
 import com.ust.my_cart.Dto.ItemDto;
@@ -25,14 +26,13 @@ public class ItemMapper {
     }
 
     private ItemDto mapSingleItem(Document doc) {
-        if (doc == null) return null;
+        if (doc == null){throw  new ProcessException("Item not found",404);}
 
         ItemDto dto = new ItemDto();
         dto.set_id(doc.getString("_id"));
         dto.setItemName(doc.getString("itemName"));
-        dto.setCategoryName(doc.getString("categoryId")); // can be replaced with enriched name
+        dto.setCategoryName(doc.getString("categoryId"));
         dto.setSpecialProduct(doc.getBoolean("specialProduct", false));
-
         Document priceDoc = doc.get("itemPrice", Document.class);
         if (priceDoc != null) {
             ItemPrice price = new ItemPrice();
@@ -40,8 +40,6 @@ public class ItemMapper {
             price.setSellingPrice(priceDoc.getDouble("sellingPrice"));
             dto.setItemPrice(price);
         }
-
-        // stockDetails
         Document stockDoc = doc.get("stockDetails", Document.class);
         if (stockDoc != null) {
             StockDetails stock = new StockDetails();
@@ -49,8 +47,6 @@ public class ItemMapper {
             stock.setUnitOfMeasure(stockDoc.getString("unitOfMeasure"));
             dto.setStockDetails(stock);
         }
-
-
 
         return dto;
     }

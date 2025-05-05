@@ -1,16 +1,12 @@
 package com.ust.my_cart.Processor;
 
-import com.mongodb.client.model.Filters;
-import com.mongodb.client.model.Updates;
-import com.ust.my_cart.Dto.CategoryItemsResponse;
-import com.ust.my_cart.Dto.ItemDto;
+
 import com.ust.my_cart.Exception.ProcessException;
 import com.ust.my_cart.Model.Category;
 import com.ust.my_cart.Model.Item;
-import com.ust.my_cart.utils.ItemMapper;
 import com.ust.my_cart.utils.MongoService;
 import org.apache.camel.Exchange;
-import org.apache.camel.Processor;
+
 import org.bson.Document;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.data.mongodb.core.MongoTemplate;
@@ -22,13 +18,8 @@ import java.util.*;
 
 @Component
 public class ItemProcessor {
-    private final MongoService mongoService;
-
     @Autowired
-    public ItemProcessor(MongoService mongoService) {
-        this.mongoService = mongoService;
-    }
-
+    private  MongoService mongoService;
     @Autowired
     private MongoTemplate mongoTemplate;
 
@@ -89,11 +80,6 @@ public class ItemProcessor {
         String categoryDep = categoryDoc.getString("categoryDep");
         exchange.setProperty("categoryName", categoryName);
         exchange.setProperty("categoryDep", categoryDep);
-    }
-
-    private String formatDate(LocalDateTime dateTime) {
-        DateTimeFormatter formatter = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss");
-        return dateTime.format(formatter);
     }
 
 

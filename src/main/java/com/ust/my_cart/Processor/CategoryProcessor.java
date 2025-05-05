@@ -39,7 +39,7 @@ public class CategoryProcessor {
         };
     }
 
-    public void insertCategoryProcessor(Exchange exchange) {
+    public void validateCategory(Exchange exchange) {
         Category category = exchange.getIn().getBody(Category.class);
 
         if (category.get_id() == null || category.get_id().trim().isEmpty()) {

@@ -96,18 +96,4 @@ public class MongoService {
         }
     }
 
-    public void applySingleInventoryUpdate(Exchange exchange) {
-        Map<String, Object> updatePayload = exchange.getIn().getBody(Map.class);
-        String itemId = (String) updatePayload.get("_id");
-        int totalReduction = (Integer) updatePayload.get("totalReduction");
-
-        Bson criteria = Filters.eq("_id", itemId);
-        Bson updateQuery = Updates.combine(
-                Updates.inc("stockDetails.availableStock", -totalReduction),
-                Updates.set("lastUpdateDate", formatDate(LocalDateTime.now()))  // Automatically set lastUpdateDate
-        );
-
-        MongoCollection<Document> itemCollection = database.getCollection("item");
-        itemCollection.updateOne(criteria, updateQuery);
-    }
 }

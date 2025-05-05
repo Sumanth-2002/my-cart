@@ -12,7 +12,7 @@ import java.util.Map;
 
 @Component
 public class ResponseHelper {
-    public void categorySuccessResponse(Exchange exchange) {
+    public void insertCategoryResponse(Exchange exchange) {
 
         exchange.getIn().setHeader(Exchange.HTTP_RESPONSE_CODE, 201);
         exchange.getIn().setHeader(Exchange.CONTENT_TYPE, "application/json");
@@ -22,15 +22,15 @@ public class ResponseHelper {
         ));
     }
 
-    public void handleCategoryResponseProcessor(Exchange exchange) {
+    public void findCategoryByIdResponse(Exchange exchange) {
         Document category = exchange.getIn().getBody(Document.class);
         if (category == null || category.isEmpty()) {
-            throw new ProcessException("Category not found for the given ID.", 400);
+            throw new ProcessException("Category not found for the given ID.", 404);
         }
         exchange.getIn().setBody(category);
     }
 
-    public void handleItemInsertion(Exchange exchange) {
+    public void itemInsertionResponse(Exchange exchange) {
         exchange.getIn().setHeader(Exchange.HTTP_RESPONSE_CODE, 201);
         exchange.getIn().setHeader(Exchange.CONTENT_TYPE, "application/json");
         exchange.getIn().setBody(Map.of(
