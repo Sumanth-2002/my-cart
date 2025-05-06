@@ -1,6 +1,5 @@
 package com.ust.my_cart.CamelRoutes;
 
-import com.fasterxml.jackson.databind.ObjectMapper;
 import org.apache.camel.builder.RouteBuilder;
 import org.bson.Document;
 import org.springframework.stereotype.Component;
@@ -21,7 +20,6 @@ public class RequirementThreeRoute extends RouteBuilder {
 
         from("direct:fetchOneItemXml")
                 .log("Received request for item with id: ${header.id}")
-
                 .process(exchange -> {
                     String itemId = exchange.getIn().getHeader("id", String.class);
                     Document query = new Document("_id", itemId);
@@ -54,16 +52,14 @@ public class RequirementThreeRoute extends RouteBuilder {
                         }
                     }
                     model.put("review", reviews);
-                    exchange.getIn().setBody(model);
-                    log.info("Passing the following model to FreeMarker: " + model);
+                    // Set exchange body to stringified model
+                    String modelString = model.toString();
+                    exchange.getIn().setBody(modelString);
+                    log.info("Model prepared for FreeMarker: " + modelString);
                 })
-                .log("Model set for FreeMarker: ${body}")
-                .process(exchange -> {
-                    Map<String, Object> model = exchange.getIn().getBody(Map.class);
-                    ObjectMapper mapper = new ObjectMapper();
-                    String jsonModel = mapper.writeValueAsString(model);
-                    exchange.getIn().setBody(jsonModel);
-                })
-                .to("freemarker:templates/single-item-template.ftl");
+                .log("Exchange body before FreeMarker: ${body}")
+                .to("freemarker:templates/single-item-template.ftl")
+                .setHeader("Content-Type", constant("application/xml"))
+                .log("FreeMarker output: ${body}");
     }
 }

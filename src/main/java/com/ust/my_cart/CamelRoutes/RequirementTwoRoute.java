@@ -13,11 +13,6 @@ public class RequirementTwoRoute extends RouteBuilder {
     private ItemProcessor itemProcessor;
     @Override
     public void configure() throws Exception {
-        rest("/myCart")
-                .post("/item/update/async")
-                .consumes("application/json")
-                .to("direct:updateInventoryAsync");
-
         from("direct:updateInventoryAsync")
                 .routeId("updateInventoryRouteAsync")
                 .process(itemProcessor::validateAndPrepareAsyncUpdate)
@@ -26,6 +21,5 @@ public class RequirementTwoRoute extends RouteBuilder {
                 .to("activemq:queue:inventory.update.queue?exchangePattern=InOnly&deliveryMode=2")
                 .end()
                 .setBody(constant("Item details are queued for update successfully"));
-
     }
 }
