@@ -87,7 +87,6 @@ public class MongoService {
             Document updatedItem = itemCollection.find(Filters.eq("_id", itemId)).first();
             Document updatedStockDetails = (Document) updatedItem.get("stockDetails");
             int updatedStock = updatedStockDetails.getInteger("availableStock", 0);
-
             successfulUpdates.add(Map.of(
                     "itemId", itemId,
                     "status", "updated",

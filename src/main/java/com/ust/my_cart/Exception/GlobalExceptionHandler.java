@@ -21,7 +21,6 @@ public class GlobalExceptionHandler implements Processor {
         Map<String, Object> error = new HashMap<>();
         error.put("status", "error");
         error.put("message", message);
-
         exchange.getMessage().setHeader(Exchange.HTTP_RESPONSE_CODE, statusCode);
         exchange.getMessage().setBody(error);
     }

@@ -11,12 +11,14 @@ import org.bson.Document;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.data.mongodb.core.MongoTemplate;
 import org.springframework.stereotype.Component;
+
+import java.time.LocalDate;
 import java.util.*;
 
 @Component
 public class ItemProcessor {
     @Autowired
-    private  MongoService mongoService;
+    private MongoService mongoService;
     @Autowired
     private MongoTemplate mongoTemplate;
 
@@ -111,13 +113,67 @@ public class ItemProcessor {
         exchange.setProperty("successfulUpdates", successfulUpdates);
     }
 
+    public void updateStock(Exchange exchange) {
+        List<Map<String, Object>> errors = exchange.getProperty("errors", List.class);
+        List<Map<String, Object>> successfulUpdates = exchange.getProperty("successfulUpdates", List.class);
+
+        try {
+            Map<String, Object> item = exchange.getIn().getBody(Map.class);
+            String itemId = exchange.getProperty("itemId", String.class);
+            Integer totalReduction = exchange.getProperty("totalReduction", Integer.class);
+
+            if (item == null) {
+                errors.add(Map.of("itemId", itemId, "error", "Item not found in database"));
+                exchange.setProperty("skipSave", true);
+                return;
+            }
+
+            Map<String, Object> stockDetails = (Map<String, Object>) item.get("stockDetails");
+            if (stockDetails == null) {
+                errors.add(Map.of("itemId", itemId, "error", "Stock Details not found"));
+                exchange.setProperty("skipSave", true);
+                return;
+            }
+
+            int availableStock = Integer.parseInt(stockDetails.getOrDefault("availableStock", "0").toString());
+            int soldOut = Integer.parseInt(stockDetails.getOrDefault("soldOut", "0").toString());
+            int damaged = Integer.parseInt(stockDetails.getOrDefault("damaged", "0").toString());
+
+            if (totalReduction > availableStock) {
+                errors.add(Map.of("itemId", itemId, "error", "Total reduction exceeds available stock"));
+                exchange.setProperty("skipSave", true);
+                return;
+            }
+
+            stockDetails.put("availableStock", availableStock - totalReduction);
+            stockDetails.put("soldOut", soldOut + totalReduction);
+            stockDetails.put("damaged", damaged); // Leave unchanged for now
+
+            item.put("stockDetails", stockDetails);
+            item.put("lastUpdateDate", LocalDate.now().toString());
+
+            exchange.getIn().setBody(item);
+            successfulUpdates.add(Map.of("itemId", itemId, "status", "updated"));
+            exchange.setProperty("skipSave", false);  // Explicit success flag
+
+        } catch (Exception e) {
+            e.printStackTrace();
+            exchange.setProperty("skipSave", true);  // Prevent saving on error
+            throw new ProcessException("Stock update failed: " + e.getMessage(), 400);
+        }
+    }
+
+
+
 
     public void prepareInventoryUpdateResponse(Exchange exchange) {
         Map<String, Object> response = new HashMap<>();
         List<Map<String, Object>> successfulUpdates = exchange.getProperty("successfulUpdates", List.class);
         List<Map<String, Object>> errors = exchange.getProperty("errors", List.class);
         response.put("successfulUpdates", successfulUpdates);
-        response.put("errors", errors);
+        if (errors.size() != 0) {
+            response.put("errors", errors);
+        }
         exchange.getIn().setHeader(Exchange.CONTENT_TYPE, "application/json");
         exchange.getIn().setHeader(Exchange.HTTP_RESPONSE_CODE, errors.isEmpty() ? 200 : 400);
         exchange.getIn().setBody(response);
@@ -169,9 +225,6 @@ public class ItemProcessor {
         exchange.setProperty("errors", errors);
 //        exchange.getIn().setBody(updates);
     }
-
-
-
 
 
 }

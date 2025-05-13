@@ -2,15 +2,12 @@ package com.ust.my_cart.CamelRoutes;
 
 import com.ust.my_cart.utils.MongoConstants;
 import com.ust.my_cart.Exception.GlobalExceptionHandler;
-import com.ust.my_cart.Model.Category;
-import com.ust.my_cart.Model.Item;
 import com.ust.my_cart.Processor.CategoryProcessor;
 import com.ust.my_cart.Processor.ItemProcessor;
 import com.ust.my_cart.utils.ItemMapper;
 import com.ust.my_cart.utils.MongoService;
 import com.ust.my_cart.utils.ResponseHelper;
 import org.apache.camel.builder.RouteBuilder;
-
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Component;
 
@@ -45,8 +42,6 @@ public class RequirementOneRoute extends RouteBuilder {
                 .end();
 
         // REST endpoints for category and item operations
-
-
         // Route to insert a new category into MongoDB
         from("direct:insertCategory")
                 .routeId("insertCategoryRoute")
@@ -92,12 +87,35 @@ public class RequirementOneRoute extends RouteBuilder {
                 .bean(itemMapper, "mapToItemDto");
 
         // Route to update inventory for items
+//        from("direct:updateInventory")
+//                .routeId("updateInventoryRoute")
+//                .process(itemProcessor::validateAndPrepareInventoryUpdates)
+//                .process(mongoService::applyInventoryUpdates)
+//                .process(itemProcessor::prepareInventoryUpdateResponse)
+//                .log("Returning response: ${body}");
+
         from("direct:updateInventory")
                 .routeId("updateInventoryRoute")
+
                 .process(itemProcessor::validateAndPrepareInventoryUpdates)
-                .process(mongoService::applyInventoryUpdates)
-                .process(itemProcessor::prepareInventoryUpdateResponse)
+
+                .split(simple("${exchangeProperty.updates}")).streaming()
+                .setHeader("CamelMongoDbCriteria", simple("{ \"_id\": \"${body[itemId]}\" }"))
+                .setProperty("itemId", simple("${body[itemId]}"))
+                .setProperty("totalReduction", simple("${body[totalReduction]}"))
+                .to("mongodb:mycartdb?database=cart&collection=item&operation=findOneByQuery")
+                .bean(itemProcessor, "updateStock")
+                .choice()
+                .when(simple("${exchangeProperty.skipSave} == false"))
+                .to("mongodb:mycartdb?database=cart&collection=item&operation=save")
+                .end()
+                .end() // <--- This ends the split block
+
+                // Only executed once after all splits
+                .bean(itemProcessor,"prepareInventoryUpdateResponse")
                 .log("Returning response: ${body}");
+
+
     }
 }
 
