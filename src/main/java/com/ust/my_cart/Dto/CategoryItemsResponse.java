@@ -1,13 +1,14 @@
 package com.ust.my_cart.Dto;
 
 import com.fasterxml.jackson.annotation.JsonInclude;
+import com.ust.my_cart.Model.Item;
 
 import java.util.List;
 @JsonInclude(JsonInclude.Include.NON_NULL)
 public class CategoryItemsResponse {
     private String categoryName;
     private String categoryDepartment;
-    private List<ItemDto> items;
+    private List<Item> items;
     private String message;
     // Getters & Setters
     public String getCategoryName() {
@@ -26,11 +27,11 @@ public class CategoryItemsResponse {
         this.categoryDepartment = categoryDepartment;
     }
 
-    public List<ItemDto> getItems() {
+    public List<Item> getItems() {
         return items;
     }
 
-    public void setItems(List<ItemDto> items) {
+    public void setItems(List<Item> items) {
         this.items = items;
     }
 

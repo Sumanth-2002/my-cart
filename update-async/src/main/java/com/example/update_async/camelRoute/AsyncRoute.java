@@ -13,11 +13,12 @@ public class AsyncRoute extends RouteBuilder {
     private MongoService mongoService;
     @Override
     public void configure() throws Exception {
-        from("activemq:queue:inventory.update.queue")
+        from("activemq:queue:inventory.update.queue?concurrentConsumers=10")
                 .routeId("inventoryAsyncUpdater")
-                .threads(10)
                 .unmarshal().json(JsonLibrary.Jackson, Map.class)
+                .log("Received Body: ${body}")
                 .process(mongoService::applySingleInventoryUpdate)
                 .log("Stock updated asynchronously for item: ${body}");
+
     }
 }

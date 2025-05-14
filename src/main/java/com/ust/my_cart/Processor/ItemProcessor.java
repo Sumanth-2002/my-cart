@@ -1,10 +1,13 @@
 package com.ust.my_cart.Processor;
 
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
 
 import com.ust.my_cart.Exception.ProcessException;
 import com.ust.my_cart.Model.Category;
 import com.ust.my_cart.Model.Item;
-import com.ust.my_cart.utils.MongoService;
+
 import org.apache.camel.Exchange;
 
 import org.bson.Document;
@@ -17,12 +20,11 @@ import java.util.*;
 
 @Component
 public class ItemProcessor {
-    @Autowired
-    private MongoService mongoService;
+
     @Autowired
     private MongoTemplate mongoTemplate;
 
-
+    private static final Logger logger = LoggerFactory.getLogger(ItemProcessor.class);
     public void createItemProcessor(Item item) {
         if (item == null || item.get_id() == null || item.get_id().trim().isEmpty()) {
             throw new ProcessException("Item ID is required and must not be empty", 400);
@@ -105,7 +107,8 @@ public class ItemProcessor {
 
             updates.add(Map.of(
                     "itemId", itemId,
-                    "totalReduction", totalReduction
+                    "soldout", soldOut,
+                    "damaged", damaged
             ));
         }
         exchange.setProperty("errors", errors);
@@ -119,8 +122,11 @@ public class ItemProcessor {
 
         try {
             Map<String, Object> item = exchange.getIn().getBody(Map.class);
+
             String itemId = exchange.getProperty("itemId", String.class);
-            Integer totalReduction = exchange.getProperty("totalReduction", Integer.class);
+            System.out.println(itemId);
+            Integer newSoldout = (Integer) exchange.getProperty("soldout");
+            Integer newDamaged = (Integer) exchange.getProperty("damaged");
 
             if (item == null) {
                 errors.add(Map.of("itemId", itemId, "error", "Item not found in database"));
@@ -139,31 +145,29 @@ public class ItemProcessor {
             int soldOut = Integer.parseInt(stockDetails.getOrDefault("soldOut", "0").toString());
             int damaged = Integer.parseInt(stockDetails.getOrDefault("damaged", "0").toString());
 
-            if (totalReduction > availableStock) {
+            if ((newDamaged+newSoldout) > availableStock) {
                 errors.add(Map.of("itemId", itemId, "error", "Total reduction exceeds available stock"));
                 exchange.setProperty("skipSave", true);
                 return;
             }
 
-            stockDetails.put("availableStock", availableStock - totalReduction);
-            stockDetails.put("soldOut", soldOut + totalReduction);
-            stockDetails.put("damaged", damaged); // Leave unchanged for now
+            stockDetails.put("availableStock", availableStock - (newDamaged+newSoldout));
+            stockDetails.put("soldOut", soldOut + newSoldout);
+            stockDetails.put("damaged", newDamaged);
 
             item.put("stockDetails", stockDetails);
             item.put("lastUpdateDate", LocalDate.now().toString());
 
             exchange.getIn().setBody(item);
             successfulUpdates.add(Map.of("itemId", itemId, "status", "updated"));
-            exchange.setProperty("skipSave", false);  // Explicit success flag
+            exchange.setProperty("skipSave", false);
 
         } catch (Exception e) {
             e.printStackTrace();
-            exchange.setProperty("skipSave", true);  // Prevent saving on error
+            exchange.setProperty("skipSave", true);
             throw new ProcessException("Stock update failed: " + e.getMessage(), 400);
         }
     }
-
-
 
 
     public void prepareInventoryUpdateResponse(Exchange exchange) {
@@ -185,7 +189,6 @@ public class ItemProcessor {
 
         List<Map<String, Object>> errors = new ArrayList<>();
         List<Map<String, Object>> updates = new ArrayList<>();
-        List<Map<String, Object>> successfulUpdates = new ArrayList<>();
 
         for (Map<String, Object> item : items) {
             if (item != null) {
@@ -194,7 +197,7 @@ public class ItemProcessor {
                 int soldOut = Integer.parseInt(String.valueOf(stockDetails.getOrDefault("soldOut", "0")));
                 int damaged = Integer.parseInt(String.valueOf(stockDetails.getOrDefault("damaged", "0")));
                 int totalReduction = soldOut + damaged;
-                Document existing = mongoService.findItemById(itemId);
+                Document existing = mongoTemplate.findById(itemId, Document.class, "item");
                 if (existing == null) {
                     errors.add(Map.of("itemId", itemId, "error", "Item not found in database"));
                     continue;
@@ -209,21 +212,27 @@ public class ItemProcessor {
                 Map<String, Object> updatePayload = new HashMap<>();
                 updatePayload.put("_id", itemId);
                 updatePayload.put("totalReduction", totalReduction);
+                updatePayload.put("soldout",soldOut);
+                updatePayload.put("damaged",damaged);
                 updatePayload.put("availableStock", availableStock - totalReduction);
                 updates.add(updatePayload);
-                successfulUpdates.add(Map.of(
-                        "itemId", itemId,
-                        "status", "updated",
-                        "availableStock", availableStock - totalReduction
-                ));
+
             } else {
                 errors.add(Map.of("itemId", null, "error", "Item is null in the input payload"));
+
             }
+
         }
         exchange.setProperty("updates", updates);
-        exchange.setProperty("successfulUpdates", successfulUpdates);
         exchange.setProperty("errors", errors);
-//        exchange.getIn().setBody(updates);
+        if (!errors.isEmpty()) {
+            logger.error("Inventory update validation completed with {} error(s):", errors.size());
+            for (Map<String, Object> error : errors) {
+                logger.error(" - {}", error);
+            }
+        } else {
+            logger.info(" Inventory update validation completed with no errors.");
+        }
     }
 
 

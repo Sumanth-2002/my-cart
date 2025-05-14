@@ -1,11 +1,11 @@
 package com.ust.my_cart.CamelRoutes;
 
+import com.ust.my_cart.Processor.FindCategoryByIdProcessor;
+import com.ust.my_cart.Processor.ValidateCategoryProcessor;
 import com.ust.my_cart.utils.MongoConstants;
 import com.ust.my_cart.Exception.GlobalExceptionHandler;
-import com.ust.my_cart.Processor.CategoryProcessor;
 import com.ust.my_cart.Processor.ItemProcessor;
-import com.ust.my_cart.utils.ItemMapper;
-import com.ust.my_cart.utils.MongoService;
+
 import com.ust.my_cart.utils.ResponseHelper;
 import org.apache.camel.builder.RouteBuilder;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -18,16 +18,13 @@ public class RequirementOneRoute extends RouteBuilder {
     private ItemProcessor itemProcessor;
 
     @Autowired
-    private CategoryProcessor categoryProcessor;
+    private ValidateCategoryProcessor validateCategoryProcessor;
 
     @Autowired
     private GlobalExceptionHandler globalExceptionHandler;
-
     @Autowired
-    private MongoService mongoService;
+    private FindCategoryByIdProcessor findCategoryByIdProcessor;
 
-    @Autowired
-    private ItemMapper itemMapper;
 
     @Autowired
     private ResponseHelper responseHelper;
@@ -42,10 +39,9 @@ public class RequirementOneRoute extends RouteBuilder {
                 .end();
 
         // REST endpoints for category and item operations
-        // Route to insert a new category into MongoDB
         from("direct:insertCategory")
                 .routeId("insertCategoryRoute")
-                .bean(categoryProcessor, "validateCategory")
+                .process(validateCategoryProcessor)
                 .to(MongoConstants.SAVE_CATEGORY)
                 .bean(responseHelper, "insertCategoryResponse");
 
@@ -55,7 +51,7 @@ public class RequirementOneRoute extends RouteBuilder {
 
         // Route to retrieve a category by its ID
         from("direct:findCategoryById")
-                .process(categoryProcessor.findCategoryByIdProcessor())
+                .process(validateCategoryProcessor)
                 .to(MongoConstants.FIND_CATEGORY_BY_ID)
                 .bean(responseHelper, "findCategoryByIdResponse");
 
@@ -76,15 +72,13 @@ public class RequirementOneRoute extends RouteBuilder {
         // Route to retrieve all items from MongoDB
         from("direct:findAllItems")
                 .routeId("findAllItemsRoute")
-                .to(MongoConstants.FIND_ALL_ITEMS)
-                .bean(itemMapper, "mapToItemDtoList");
+                .to(MongoConstants.FIND_ALL_ITEMS);
 
-        // Route to retrieve an item by its ID
+        // Route; to retrieve an item by its ID
         from("direct:findItemById")
                 .routeId("findItemByIdRoute")
                 .setBody(simple("{ '_id': '${header.id}' }"))
-                .to(MongoConstants.FIND_ITEM_BY_ID)
-                .bean(itemMapper, "mapToItemDto");
+                .to(MongoConstants.FIND_ITEM_BY_ID);
 
         // Route to update inventory for items
 //        from("direct:updateInventory")
@@ -96,23 +90,20 @@ public class RequirementOneRoute extends RouteBuilder {
 
         from("direct:updateInventory")
                 .routeId("updateInventoryRoute")
-
                 .process(itemProcessor::validateAndPrepareInventoryUpdates)
-
                 .split(simple("${exchangeProperty.updates}")).streaming()
                 .setHeader("CamelMongoDbCriteria", simple("{ \"_id\": \"${body[itemId]}\" }"))
                 .setProperty("itemId", simple("${body[itemId]}"))
-                .setProperty("totalReduction", simple("${body[totalReduction]}"))
+                .setProperty("soldout", simple("${body[soldout]}"))
+                .setProperty("damaged", simple("${body[damaged]}"))
                 .to("mongodb:mycartdb?database=cart&collection=item&operation=findOneByQuery")
                 .bean(itemProcessor, "updateStock")
                 .choice()
                 .when(simple("${exchangeProperty.skipSave} == false"))
                 .to("mongodb:mycartdb?database=cart&collection=item&operation=save")
                 .end()
-                .end() // <--- This ends the split block
-
-                // Only executed once after all splits
-                .bean(itemProcessor,"prepareInventoryUpdateResponse")
+                .end()
+                .bean(itemProcessor, "prepareInventoryUpdateResponse")
                 .log("Returning response: ${body}");
 
 

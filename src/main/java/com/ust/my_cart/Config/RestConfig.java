@@ -54,6 +54,7 @@ public class RestConfig extends RouteBuilder {
                 .post("/item/update")
                 .consumes("application/json")
                 .to("direct:updateInventory")
+
                 .post("/item/update/async")
                 .consumes("application/json")
                 .to("direct:updateInventoryAsync");

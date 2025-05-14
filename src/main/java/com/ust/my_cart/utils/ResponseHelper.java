@@ -1,8 +1,8 @@
 package com.ust.my_cart.utils;
 
 import com.ust.my_cart.Dto.CategoryItemsResponse;
-import com.ust.my_cart.Dto.ItemDto;
 import com.ust.my_cart.Exception.ProcessException;
+import com.ust.my_cart.Model.Item;
 import org.apache.camel.Exchange;
 import org.bson.Document;
 import org.springframework.stereotype.Component;
@@ -40,14 +40,14 @@ public class ResponseHelper {
     }
 
     public void findItemsByCategoryIdResponse(Exchange exchange) {
-        List<Document> items = (List<Document>) exchange.getIn().getBody();
-        List<ItemDto> itemDtos = new ItemMapper().mapToItemDtoList(items);
+        List<Item> items = (List<Item>) exchange.getIn().getBody();
+
 
         CategoryItemsResponse response = new CategoryItemsResponse();
         response.setCategoryName(exchange.getProperty("categoryName").toString());
         response.setCategoryDepartment(exchange.getProperty("categoryDep").toString());
-        response.setItems(itemDtos);
-        if (itemDtos.isEmpty()) {
+        response.setItems(items);
+        if (items.isEmpty()) {
             response.setMessage("No items found for categoryId: " + exchange.getProperty("categoryId").toString());
         }
         exchange.getIn().setBody(response);
