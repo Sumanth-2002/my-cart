@@ -8,9 +8,8 @@ import org.bson.conversions.Bson;
 import org.springframework.stereotype.Component;
 
 
-
 @Component
-public class FindCategoryByIdProcessor implements Processor {
+public class LoadCategoryDetailsProcessor implements Processor {
     @Override
     public void process(Exchange exchange) throws Exception {
         String categoryId = exchange.getIn().getHeader("id", String.class);

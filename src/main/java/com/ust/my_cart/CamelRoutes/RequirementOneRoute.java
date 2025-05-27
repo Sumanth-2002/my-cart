@@ -1,13 +1,14 @@
 package com.ust.my_cart.CamelRoutes;
 
-import com.ust.my_cart.Processor.FindCategoryByIdProcessor;
+import com.ust.my_cart.Bean.ItemBean;
+import com.ust.my_cart.Processor.LoadCategoryDetailsProcessor;
 import com.ust.my_cart.Processor.ValidateCategoryProcessor;
 import com.ust.my_cart.utils.MongoConstants;
 import com.ust.my_cart.Exception.GlobalExceptionHandler;
-import com.ust.my_cart.Processor.ItemProcessor;
-
 import com.ust.my_cart.utils.ResponseHelper;
 import org.apache.camel.builder.RouteBuilder;
+import org.apache.camel.component.mongodb.MongoDbConstants;
+import org.bson.Document;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Component;
 
@@ -15,7 +16,7 @@ import org.springframework.stereotype.Component;
 public class RequirementOneRoute extends RouteBuilder {
 
     @Autowired
-    private ItemProcessor itemProcessor;
+    private ItemBean itemBean;
 
     @Autowired
     private ValidateCategoryProcessor validateCategoryProcessor;
@@ -23,9 +24,7 @@ public class RequirementOneRoute extends RouteBuilder {
     @Autowired
     private GlobalExceptionHandler globalExceptionHandler;
     @Autowired
-    private FindCategoryByIdProcessor findCategoryByIdProcessor;
-
-
+    private LoadCategoryDetailsProcessor findCategoryByIdProcessor;
     @Autowired
     private ResponseHelper responseHelper;
 
@@ -42,8 +41,13 @@ public class RequirementOneRoute extends RouteBuilder {
         from("direct:insertCategory")
                 .routeId("insertCategoryRoute")
                 .process(validateCategoryProcessor)
+                .to(MongoConstants.FIND_CATEGORY_BY_ID)
+                .choice()
+                .when(body().isNull())
                 .to(MongoConstants.SAVE_CATEGORY)
+                .end()
                 .bean(responseHelper, "insertCategoryResponse");
+
 
         // Route to retrieve all categories from MongoDB
         from("direct:findAllCategories")
@@ -51,21 +55,25 @@ public class RequirementOneRoute extends RouteBuilder {
 
         // Route to retrieve a category by its ID
         from("direct:findCategoryById")
-                .process(validateCategoryProcessor)
+                .process(findCategoryByIdProcessor)
                 .to(MongoConstants.FIND_CATEGORY_BY_ID)
                 .bean(responseHelper, "findCategoryByIdResponse");
 
         // Route to insert a new item into MongoDB
         from("direct:insertItem")
                 .routeId("createItemRoute")
-                .bean(ItemProcessor.class, "createItemProcessor")
+                .bean(itemBean, "validateItem")
                 .to(MongoConstants.SAVE_ITEM)
                 .bean(responseHelper, "itemInsertionResponse");
 
         // Route to find items by category ID
         from("direct:findItemsByCategoryId")
                 .routeId("findItemsByCategoryIdRoute")
-                .bean(itemProcessor, "findItemsByCategoryId")
+                .setBody(simple("{ '_id': '${header.categoryid}' }"))
+                .to("mongodb:myMongoClient?database=cart&collection=category&operation=findOneByQuery")
+//                .to(MongoConstants.FIND_CATEGORY_BY_ID)
+                .bean(itemBean,"mapCategoryDetails")
+                .bean(itemBean, "buildCategoryItemQueryWithSpecialFilter")
                 .to(MongoConstants.FIND_ITEMS_BY_QUERY)
                 .bean(responseHelper, "findItemsByCategoryIdResponse");
 
@@ -78,34 +86,47 @@ public class RequirementOneRoute extends RouteBuilder {
         from("direct:findItemById")
                 .routeId("findItemByIdRoute")
                 .setBody(simple("{ '_id': '${header.id}' }"))
-                .to(MongoConstants.FIND_ITEM_BY_ID);
+                .setHeader(MongoDbConstants.FIELDS_PROJECTION, constant("{ 'review': 0,'stockDetails.soldOut':0,'stockDetails.damaged':0,'lastUpdateDate':0 }"))
+                .to("mongodb:myMongoClient?database=cart&collection=item&operation=findOneByQuery")
+                .log("Fetched item: ${body}")
+                .process(exchange -> {
+                    Document item = exchange.getIn().getBody(Document.class);
+                    Object categoryId = item.get("categoryId");
+                    exchange.setProperty("itemDocument", item); // save for later
+                    exchange.getIn().setBody(new Document("_id", categoryId));
+                })
+                // Step 3: Find category by categoryId
+                .to("mongodb:myMongoClient?database=cart&collection=category&operation=findOneByQuery")
+                .log("Fetched category: ${body}")
+                .process(exchange -> {
+                    Document category = exchange.getIn().getBody(Document.class);
+                    String categoryName = category != null ? category.getString("categoryName") : null;
+                    Document item = exchange.getProperty("itemDocument", Document.class);
+                    item.remove("categoryId");
+                    item.put("categoryName", categoryName);
+                    exchange.getIn().setBody(item);
+                })
+                .log("Final transformed item: ${body}");
 
-        // Route to update inventory for items
-//        from("direct:updateInventory")
-//                .routeId("updateInventoryRoute")
-//                .process(itemProcessor::validateAndPrepareInventoryUpdates)
-//                .process(mongoService::applyInventoryUpdates)
-//                .process(itemProcessor::prepareInventoryUpdateResponse)
-//                .log("Returning response: ${body}");
+
 
         from("direct:updateInventory")
                 .routeId("updateInventoryRoute")
-                .process(itemProcessor::validateAndPrepareInventoryUpdates)
+                .bean(itemBean,"validateInventoryUpdates")
                 .split(simple("${exchangeProperty.updates}")).streaming()
                 .setHeader("CamelMongoDbCriteria", simple("{ \"_id\": \"${body[itemId]}\" }"))
                 .setProperty("itemId", simple("${body[itemId]}"))
                 .setProperty("soldout", simple("${body[soldout]}"))
                 .setProperty("damaged", simple("${body[damaged]}"))
-                .to("mongodb:mycartdb?database=cart&collection=item&operation=findOneByQuery")
-                .bean(itemProcessor, "updateStock")
+                .to(MongoConstants.FIND_ITEM_BY_ID)
+                .bean(itemBean, "prepareInventoryUpdates")
                 .choice()
                 .when(simple("${exchangeProperty.skipSave} == false"))
-                .to("mongodb:mycartdb?database=cart&collection=item&operation=save")
+                .to(MongoConstants.UPDATE_ITEM)
                 .end()
                 .end()
-                .bean(itemProcessor, "prepareInventoryUpdateResponse")
+                .bean(responseHelper, "prepareInventoryUpdateResponse")
                 .log("Returning response: ${body}");
-
 
     }
 }

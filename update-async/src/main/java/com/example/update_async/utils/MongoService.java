@@ -43,7 +43,7 @@ public class MongoService {
         Bson updateQuery = Updates.combine(
                 Updates.inc("stockDetails.availableStock", -(soldout + damaged)),
                         Updates.set("lastUpdateDate", formatDate(LocalDateTime.now())),
-                        Updates.inc("stockDetails.soldout", +soldout),
+                        Updates.inc("stockDetails.soldOut", +soldout),
                         Updates.inc("stockDetails.damaged", +damaged)
         );
 

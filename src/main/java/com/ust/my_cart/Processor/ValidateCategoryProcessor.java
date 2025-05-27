@@ -1,9 +1,11 @@
 package com.ust.my_cart.Processor;
 
+import com.mongodb.client.model.Filters;
 import com.ust.my_cart.Exception.ProcessException;
 import com.ust.my_cart.Model.Category;
 import org.apache.camel.Exchange;
 import org.apache.camel.Processor;
+import org.bson.conversions.Bson;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.data.mongodb.core.MongoTemplate;
 
@@ -20,13 +22,12 @@ public class ValidateCategoryProcessor implements Processor {
     public void process(Exchange exchange) throws Exception {
         Category category = exchange.getIn().getBody(Category.class);
 
-        if (category.get_id() == null || category.get_id().trim().isEmpty()) {
+        String categoryId  = category.get_id();
+        if (categoryId == null || categoryId.trim().isEmpty()) {
             throw new ProcessException("Category _id is required", 400);
         }
-
-        if (mongoTemplate.findById(category.get_id(), Category.class, "category") != null) {
-            throw new ProcessException("Category with this ID already exists", 409);
-        }
+        Bson filter = Filters.eq("_id", categoryId);
+        exchange.getIn().setBody(filter);
     }
 }
 

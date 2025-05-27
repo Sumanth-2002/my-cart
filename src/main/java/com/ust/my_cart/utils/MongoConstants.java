@@ -9,7 +9,7 @@ public class MongoConstants {
     public static final String SAVE_ITEM = BASE_URI + "item&operation=insert";
     public static final String FIND_ALL_ITEMS = BASE_URI + "item&operation=findAll";
     public static final String FIND_ITEM_BY_ID = BASE_URI + "item&operation=findOneByQuery";
-    public static final String UPDATE_ITEM = BASE_URI + "item&operation=bulkWrite";
+    public static final String UPDATE_ITEM = BASE_URI + "item&operation=save";
     public static final String REMOVE_ITEM = BASE_URI + "item&operation=remove";
 
     // === CATEGORY Collection Operations ===

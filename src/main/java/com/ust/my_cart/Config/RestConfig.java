@@ -2,14 +2,29 @@ package com.ust.my_cart.Config;
 
 import com.ust.my_cart.Model.Category;
 import com.ust.my_cart.Model.Item;
+import org.apache.camel.Exchange;
 import org.apache.camel.builder.RouteBuilder;
 import org.apache.camel.model.rest.RestBindingMode;
 import org.springframework.stereotype.Component;
+
+import java.util.HashMap;
+import java.util.Map;
 
 @Component
 public class RestConfig extends RouteBuilder {
     @Override
     public void configure() {
+        onException(Throwable.class)
+                .handled(true)
+                .process(exchange -> {
+                    Exception exception = exchange.getProperty(Exchange.EXCEPTION_CAUGHT, Exception.class);
+                    Map<String, Object> errorResponse = new HashMap<>();
+                    errorResponse.put("error", "Validation Failed");
+                    errorResponse.put("message", exception.getMessage());
+                    exchange.getIn().setHeader(Exchange.HTTP_RESPONSE_CODE, 400);
+                    exchange.getIn().setHeader(Exchange.CONTENT_TYPE, "application/json");
+                    exchange.getIn().setBody(errorResponse);
+                });
         restConfiguration()
                 .component("netty-http")
                 .host("0.0.0.0")
