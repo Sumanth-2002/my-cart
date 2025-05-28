@@ -1,6 +1,7 @@
 package com.ust.my_cart.CamelRoutes;
 
 import com.ust.my_cart.Bean.ItemBean;
+import com.ust.my_cart.Exception.ProcessException;
 import com.ust.my_cart.Processor.LoadCategoryDetailsProcessor;
 import com.ust.my_cart.Processor.ValidateCategoryProcessor;
 import com.ust.my_cart.utils.MongoConstants;
@@ -91,11 +92,13 @@ public class RequirementOneRoute extends RouteBuilder {
                 .log("Fetched item: ${body}")
                 .process(exchange -> {
                     Document item = exchange.getIn().getBody(Document.class);
+                    if (item == null) {
+                        throw new ProcessException("Item not found",404);
+                    }
                     Object categoryId = item.get("categoryId");
-                    exchange.setProperty("itemDocument", item); // save for later
+                    exchange.setProperty("itemDocument", item); // Save for later
                     exchange.getIn().setBody(new Document("_id", categoryId));
                 })
-                // Step 3: Find category by categoryId
                 .to("mongodb:myMongoClient?database=cart&collection=category&operation=findOneByQuery")
                 .log("Fetched category: ${body}")
                 .process(exchange -> {
@@ -107,6 +110,7 @@ public class RequirementOneRoute extends RouteBuilder {
                     exchange.getIn().setBody(item);
                 })
                 .log("Final transformed item: ${body}");
+
 
 
 

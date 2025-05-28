@@ -54,32 +54,7 @@ public class ItemBean {
 //        }
     }
 
-    public void findItemsByCategoryId(Exchange exchange) {
 
-        String categoryId = exchange.getIn().getHeader("categoryid", String.class);
-        String includeSpecial = exchange.getIn().getHeader("includeSpecial", String.class);
-        if (categoryId == null || categoryId.trim().isEmpty()) {
-            throw new ProcessException("Missing required header: categoryid", 400);
-        }
-        String query;
-
-        if ("true".equalsIgnoreCase(includeSpecial)) {
-            query = "{ \"categoryId\": \"" + categoryId + "\" }";
-        } else {
-            query = "{ \"categoryId\": \"" + categoryId + "\", \"specialProduct\": { \"$ne\": true } }";  // exclude special products
-        }
-        exchange.getIn().setBody(Document.parse(query));
-
-
-//        Document categoryDoc = mongoTemplate.findById(categoryId, Document.class, "category");
-//        if (categoryDoc == null) {
-//            throw new ProcessException("CategoryId not found", 404);
-//        }
-//        String categoryName = categoryDoc.getString("categoryName");
-//        String categoryDep = categoryDoc.getString("categoryDep");
-//        exchange.setProperty("categoryName", categoryName);
-//        exchange.setProperty("categoryDep", categoryDep);
-    }
 
     public void buildCategoryItemQueryWithSpecialFilter(Exchange exchange) {
 
