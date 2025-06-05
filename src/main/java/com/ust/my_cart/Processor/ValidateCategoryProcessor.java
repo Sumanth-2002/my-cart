@@ -11,6 +11,7 @@ import org.springframework.data.mongodb.core.MongoTemplate;
 
 import org.springframework.stereotype.Component;
 
+
 @Component
 public class ValidateCategoryProcessor implements Processor {
 
@@ -21,13 +22,15 @@ public class ValidateCategoryProcessor implements Processor {
     @Override
     public void process(Exchange exchange) throws Exception {
         Category category = exchange.getIn().getBody(Category.class);
-
-        String categoryId  = category.get_id();
+        String categoryId = category.get_id();
         if (categoryId == null || categoryId.trim().isEmpty()) {
             throw new ProcessException("Category _id is required", 400);
         }
         Bson filter = Filters.eq("_id", categoryId);
-        exchange.getIn().setBody(filter);
+        exchange.getIn().setHeader("category", category); // Store Category POJO in header
+        exchange.getIn().setBody(filter); // Set body to Bson filter
     }
+
+
 }
 

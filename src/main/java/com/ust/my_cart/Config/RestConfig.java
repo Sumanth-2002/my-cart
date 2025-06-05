@@ -65,6 +65,8 @@ public class RestConfig extends RouteBuilder {
                 .get("/item/category/{categoryid}")
                 .to("direct:findItemsByCategoryId")
 
+                .get("/test/{categoryId}")
+                .to("direct:getItemTrendAnalyser")
                 // Endpoint to update inventory
                 .post("/item/update")
                 .consumes("application/json")

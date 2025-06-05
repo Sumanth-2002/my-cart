@@ -9,9 +9,11 @@ import com.ust.my_cart.Exception.GlobalExceptionHandler;
 import com.ust.my_cart.utils.ResponseHelper;
 import org.apache.camel.builder.RouteBuilder;
 import org.apache.camel.component.mongodb.MongoDbConstants;
+import org.apache.camel.model.dataformat.JsonLibrary;
 import org.bson.Document;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Component;
+import java.util.Map;
 
 @Component
 public class RequirementOneRoute extends RouteBuilder {
@@ -41,11 +43,22 @@ public class RequirementOneRoute extends RouteBuilder {
         // REST endpoints for category and item operations
         from("direct:insertCategory")
                 .routeId("insertCategoryRoute")
-                .process(validateCategoryProcessor)
-                .to(MongoConstants.FIND_CATEGORY_BY_ID)
+                .process(validateCategoryProcessor) // Sets body to Bson filter, stores Category in "category" header
+                .setHeader("CamelMongoDbCriteria", simple("${body}")) // Set filter header for MongoDB query
+                .to(MongoConstants.FIND_CATEGORY_BY_ID) // Uses filter from CamelMongoDbCriteria header
                 .choice()
-                .when(body().isNull())
-                .to(MongoConstants.SAVE_CATEGORY)
+                .when(body().isNull()) // Category does not exist
+                .setBody(header("category")) // Restore Category POJO
+                .marshal().json(JsonLibrary.Jackson) // Convert to JSON
+                .unmarshal().json(JsonLibrary.Jackson, Map.class) // Convert to Map
+                .process(exchange -> {
+                    Map<String, Object> map = exchange.getIn().getBody(Map.class);
+                    Document document = new Document(map);
+                    exchange.getIn().setBody(document);
+                })
+                .to(MongoConstants.SAVE_CATEGORY) // Insert Document
+                .otherwise() // Category exists
+                .throwException(new ProcessException("Category already exists", 409))
                 .end()
                 .bean(responseHelper, "insertCategoryResponse");
 
@@ -64,7 +77,17 @@ public class RequirementOneRoute extends RouteBuilder {
         from("direct:insertItem")
                 .routeId("createItemRoute")
                 .bean(itemBean, "validateItem")
+                .setHeader("item", body())
+                .to(MongoConstants.FIND_ITEM_BY_ID)
+                .choice()
+                .when(body().isNull())
+                .setBody(header("item"))
+                .marshal().json(JsonLibrary.Jackson)
+                .unmarshal().json(JsonLibrary.Jackson, Map.class)
                 .to(MongoConstants.SAVE_ITEM)
+                .otherwise()
+                .throwException(new ProcessException("Item already exists",409))
+                .end()
                 .bean(responseHelper, "itemInsertionResponse");
 
         // Route to find items by category ID
@@ -72,7 +95,6 @@ public class RequirementOneRoute extends RouteBuilder {
                 .routeId("findItemsByCategoryIdRoute")
                 .setBody(simple("{ '_id': '${header.categoryid}' }"))
                 .to("mongodb:myMongoClient?database=cart&collection=category&operation=findOneByQuery")
-//                .to(MongoConstants.FIND_CATEGORY_BY_ID)
                 .bean(itemBean,"mapCategoryDetails")
                 .bean(itemBean, "buildCategoryItemQueryWithSpecialFilter")
                 .to(MongoConstants.FIND_ITEMS_BY_QUERY)
@@ -87,32 +109,16 @@ public class RequirementOneRoute extends RouteBuilder {
         from("direct:findItemById")
                 .routeId("findItemByIdRoute")
                 .setBody(simple("{ '_id': '${header.id}' }"))
-                .setHeader(MongoDbConstants.FIELDS_PROJECTION, constant("{ 'review': 0,'stockDetails.soldOut':0,'stockDetails.damaged':0,'lastUpdateDate':0 }"))
+                .setHeader(MongoDbConstants.FIELDS_PROJECTION, constant(
+                        "{ 'review': 0, 'stockDetails.soldOut': 0, 'stockDetails.damaged': 0, 'lastUpdateDate': 0 }"
+                ))
                 .to("mongodb:myMongoClient?database=cart&collection=item&operation=findOneByQuery")
                 .log("Fetched item: ${body}")
-                .process(exchange -> {
-                    Document item = exchange.getIn().getBody(Document.class);
-                    if (item == null) {
-                        throw new ProcessException("Item not found",404);
-                    }
-                    Object categoryId = item.get("categoryId");
-                    exchange.setProperty("itemDocument", item); // Save for later
-                    exchange.getIn().setBody(new Document("_id", categoryId));
-                })
+                .bean(itemBean, "validateAndExtractCategoryId")
                 .to("mongodb:myMongoClient?database=cart&collection=category&operation=findOneByQuery")
                 .log("Fetched category: ${body}")
-                .process(exchange -> {
-                    Document category = exchange.getIn().getBody(Document.class);
-                    String categoryName = category != null ? category.getString("categoryName") : null;
-                    Document item = exchange.getProperty("itemDocument", Document.class);
-                    item.remove("categoryId");
-                    item.put("categoryName", categoryName);
-                    exchange.getIn().setBody(item);
-                })
+                .bean(itemBean, "mergeCategoryNameIntoItem")
                 .log("Final transformed item: ${body}");
-
-
-
 
         from("direct:updateInventory")
                 .routeId("updateInventoryRoute")

@@ -4,6 +4,7 @@ package com.ust.my_cart.utils;
 public class MongoConstants {
 
     private static final String BASE_URI = "mongodb:mycartdb?database=cart&collection=";
+    public static final String FILTER = "CamelMongoDbFilter";
 
     // === ITEM Collection Operations ===
     public static final String SAVE_ITEM = BASE_URI + "item&operation=insert";

@@ -26,7 +26,8 @@ public class ItemBean {
 
     private static final Logger logger = LoggerFactory.getLogger(ItemBean.class);
 
-    public void validateItem(Item item) {
+    public void validateItem(Exchange exchange) {
+        Item item = exchange.getIn().getBody(Item.class);
         if (item == null || item.get_id() == null || item.get_id().trim().isEmpty()) {
             throw new ProcessException("Item ID is required and must not be empty", 400);
         }
@@ -45,17 +46,30 @@ public class ItemBean {
         if (item.getStockDetails() != null && item.getStockDetails().getAvailableStock() < 0) {
             throw new ProcessException("Available stock cannot be negative", 400);
         }
-//        if (mongoTemplate.findById(item.get_id(), Item.class, "item") != null) {
-//            throw new ProcessException("Item with ID " + item.get_id() + " already exists", 409);
-//        }
-
-//        if (mongoTemplate.findById(item.getCategoryId(), Category.class, "category") == null) {
-//            throw new ProcessException("Category " + item.getCategoryId() + " does not exist", 404);
-//        }
+        exchange.getIn().setHeader("CamelMongoDbCriteria", new org.bson.Document("_id", item.get_id()));
     }
 
+    public void validateAndExtractCategoryId(Exchange exchange) {
+        Document item = exchange.getIn().getBody(Document.class);
+        if (item == null) {
+            throw new ProcessException("Item not found", 404);
+        }
 
+        Object categoryId = item.get("categoryId");
+        exchange.setProperty("itemDocument", item);  // Save item for later
+        exchange.getIn().setBody(new Document("_id", categoryId));
+    }
 
+    public void mergeCategoryNameIntoItem(Exchange exchange) {
+        Document category = exchange.getIn().getBody(Document.class);
+        String categoryName = category != null ? category.getString("categoryName") : null;
+
+        Document item = exchange.getProperty("itemDocument", Document.class);
+        item.remove("categoryId");  // Remove categoryId from item
+        item.put("categoryName", categoryName);  // Add categoryName to item
+
+        exchange.getIn().setBody(item);
+    }
     public void buildCategoryItemQueryWithSpecialFilter(Exchange exchange) {
 
         String categoryId = exchange.getIn().getHeader("categoryid", String.class);
@@ -91,7 +105,7 @@ public class ItemBean {
         String categoryId = categoryDoc.getString("_id");
         exchange.setProperty("categoryName", categoryName);
         exchange.setProperty("categoryDep", categoryDep);
-        exchange.setProperty("categoryId",categoryId);
+        exchange.setProperty("categoryId", categoryId);
     }
 
     public void validateInventoryUpdates(Exchange exchange) {
