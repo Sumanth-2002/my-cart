@@ -1,0 +1,66 @@
+// Item Review aggregator
+
+<?xml version="1.0" encoding="utf-8"?>
+
+<Reviews xsi:noNamespaceSchemaLocation="schema.xsd" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
+  <item id="string">
+    <Review>
+      <reviewrating>54</reviewrating>
+      <reviewcomment>string</reviewcomment>
+    </Review>
+    <Review>
+      <reviewrating>126</reviewrating>
+      <reviewcomment>string</reviewcomment>
+    </Review>
+  </item>
+  <item id="string">
+    <Review>
+      <reviewrating>108</reviewrating>
+      <reviewcomment>string</reviewcomment>
+    </Review>
+    <Review>
+      <reviewrating>24</reviewrating>
+      <reviewcomment>string</reviewcomment>
+    </Review>
+  </item>
+  <item id="string">
+    <Review>
+      <reviewrating>222</reviewrating>
+      <reviewcomment>string</reviewcomment>
+    </Review>
+    <Review>
+      <reviewrating>205</reviewrating>
+      <reviewcomment>string</reviewcomment>
+    </Review>
+    <Review>
+      <reviewrating>139</reviewrating>
+      <reviewcomment>string</reviewcomment>
+    </Review>
+    <Review>
+      <reviewrating>113</reviewrating>
+      <reviewcomment>string</reviewcomment>
+    </Review>
+  </item>
+  <item id="string">
+    <Review>
+      <reviewrating>240</reviewrating>
+      <reviewcomment>string</reviewcomment>
+    </Review>
+    <Review>
+      <reviewrating>167</reviewrating>
+      <reviewcomment>string</reviewcomment>
+    </Review>
+    <Review>
+      <reviewrating>20</reviewrating>
+      <reviewcomment>string</reviewcomment>
+    </Review>
+    <Review>
+      <reviewrating>125</reviewrating>
+      <reviewcomment>string</reviewcomment>
+    </Review>
+    <Review>
+      <reviewrating>107</reviewrating>
+      <reviewcomment>string</reviewcomment>
+    </Review>
+  </item>
+</Reviews>
