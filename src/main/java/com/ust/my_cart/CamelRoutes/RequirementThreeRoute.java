@@ -55,14 +55,8 @@ public class RequirementThreeRoute extends RouteBuilder {
                         if (body instanceof List<?>) {
                             @SuppressWarnings("unchecked")
                             List<Document> docs = (List<Document>) body;
-
-                            // Get categoryId from header
                             String categoryId = exchange.getIn().getHeader("categoryId", String.class);
-
-                            // Extract categoryName from the first document
                             String categoryName = docs.isEmpty() ? "Unknown" : docs.get(0).getString("categoryName");
-
-                            // Transform each document to Item POJO
                             List<Items> items = docs.stream()
                                     .map(doc -> new Items(
                                             doc.getString("itemId"),
@@ -71,19 +65,13 @@ public class RequirementThreeRoute extends RouteBuilder {
                                             categoryId
                                     ))
                                     .collect(Collectors.toList());
-
-                            // Build the final output structure with ItemResponse POJO
                             ItemResponse result = new ItemResponse(categoryName, items, categoryId);
-
-                            // Set the transformed result as the body
                             exchange.getIn().setBody(result);
                         } else {
                             throw new IllegalStateException("Expected List<Document> from MongoDB, but got: " + body.getClass());
                         }
                     })
-                    // Store the ItemResponse for later use in XML branch
                     .setProperty("itemResponse", simple("${body}"))
-                    // Marshal to JSON for the response
                     .marshal(jsonFormat)
                     .convertBodyTo(String.class)
                     .setHeader("Content-Type", constant("application/json"))
@@ -91,7 +79,6 @@ public class RequirementThreeRoute extends RouteBuilder {
                     .process(exchange -> {
                         System.out.println("Final JSON body: " + exchange.getIn().getBody());
                     })
-                    // Multicast to handle JSON and XML separately
                     .multicast()
                     .to("direct:jsonResponse", "direct:toXmlRoute")
                     .end();
@@ -100,21 +87,16 @@ public class RequirementThreeRoute extends RouteBuilder {
             from("direct:jsonResponse")
                     .routeId("jsonResponseRoute")
                     .log("Sending JSON response: ${body}")
-                    // Ensure this is the final response for the caller (e.g., Postman)
                     .setBody(simple("${body}"));
 
             // XML conversion and file output route
             from("direct:toXmlRoute")
                     .routeId("mongoToXmlRoute")
                     .process(exchange -> {
-                        // Retrieve the ItemResponse from the property
                         ItemResponse itemResponse = exchange.getProperty("itemResponse", ItemResponse.class);
-
-                        // Transform ItemResponse to match template expectation ($categories)
                         Map<String, Object> category = new HashMap<>();
                         category.put("id", itemResponse.getCategoryId());
                         category.put("name", itemResponse.getCategoryName());
-                        // Convert Items list to a list of maps for Velocity
                         List<Map<String, Object>> itemsList = new ArrayList<>();
                         for (Items item : itemResponse.getItems()) {
                             Map<String, Object> itemMap = new HashMap<>();
@@ -125,36 +107,17 @@ public class RequirementThreeRoute extends RouteBuilder {
                             itemsList.add(itemMap);
                         }
                         category.put("items", itemsList);
-
                         List<Map<String, Object>> categories = new ArrayList<>();
                         categories.add(category);
-
-                        // Log the data for debugging
-                        System.out.println("Transformed data for Velocity: " + categories);
-
-                        // Set the transformed data for the Velocity template
                         exchange.getIn().setBody(categories);
-
-                        // Set dynamic file name
                         String fileName = "inventory_" + System.currentTimeMillis() + ".xml";
                         exchange.getIn().setHeader("CamelFileName", fileName);
                     })
-                    .process(exchange -> {
-                        System.out.println("Before Velocity - Body: " + exchange.getIn().getBody());
-                    })
-                    // Apply Velocity template to generate XML
 //                    .to("velocity:file:src/main/resources/templates/inventory-template.vm")
                     .to("velocity:file:src/main/resources/templates/raw-template.vm")
-                    .process(exchange -> {
-                        System.out.println("After Velocity - Body: " + exchange.getIn().getBody());
-                    })
-                    // Write to file with absolute path
+
                     .to("file:C:/Users/290577/Desktop/Task/my-cart/target/output?fileName=${header.CamelFileName}&fileExist=Override")
-                    .process(exchange -> {
-                        System.out.println("After File Write - File: C:/Users/290577/Desktop/Task/my-cart/target/output/" + exchange.getIn().getHeader("CamelFileName"));
-                    })
                     .log("XML file created successfully: ${header.CamelFileName}")
-                    // Stop this branch to prevent affecting the response
                     .stop();
         }
     }
