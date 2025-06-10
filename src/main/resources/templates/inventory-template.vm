@@ -1,17 +1,17 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<!-- Created with Liquid Technologies Online Tools 1.0 (https://www.liquid-technologies.com) -->
 <inventory xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:noNamespaceSchemaLocation="schema.xsd">
-#foreach($category in $categories)
-  <category id="$category.id">
-    <categoryName>$category.name</categoryName>
-    #foreach($item in $category.items)
-    <item>
-      <itemId>$item.itemId</itemId>
-      <categoryId>$item.categoryId</categoryId>
-      <availableStock>$item.availableStock</availableStock>
-      <sellingPrice>$item.sellingPrice</sellingPrice>
-    </item>
-    #end
-  </category>
-#end
+  #foreach($entry in $body)
+    <category>
+      <id>$!{entry.id}</id>
+      <name>$!{entry.name}</name>
+      #foreach($item in $entry.items)
+        <item>
+          <itemId>$!{item.itemId}</itemId>
+          <categoryId>$!{item.categoryId}</categoryId>
+          <availableStock>$!{item.availableStock}</availableStock>
+          <sellingPrice>$!{item.sellingPrice}</sellingPrice>
+        </item>
+      #end
+    </category>
+  #end
 </inventory>
