@@ -18,7 +18,6 @@ public class RequirementThreeRoute extends RouteBuilder {
 
 
         public void configure() throws Exception {
-            // Configure JacksonDataFormat for JSON serialization
             JacksonDataFormat jsonFormat = new JacksonDataFormat();
             ObjectMapper mapper = new ObjectMapper();
             mapper.disable(SerializationFeature.FAIL_ON_EMPTY_BEANS);
@@ -29,7 +28,6 @@ public class RequirementThreeRoute extends RouteBuilder {
                     .setHeader(MongoDbConstants.OPERATION_HEADER, constant("aggregate"))
                     .setBody(exchange -> {
                         String categoryId = exchange.getIn().getHeader("categoryId", String.class);
-
                         List<Document> pipeline = new ArrayList<>();
                         pipeline.add(Document.parse("{ $match: { categoryId: '" + categoryId + "' } }"));
                         pipeline.add(Document.parse("{ $lookup: { from: 'category', localField: 'categoryId', foreignField: '_id', as: 'categoryDetails' } }"));
@@ -114,10 +112,42 @@ public class RequirementThreeRoute extends RouteBuilder {
                         exchange.getIn().setHeader("CamelFileName", fileName);
                     })
 //                    .to("velocity:file:src/main/resources/templates/inventory-template.vm")
-                    .to("velocity:file:src/main/resources/templates/raw-template.vm")
+                    .to("velocity:file:src/main/resources/templates/inventory-template.vm")
 
                     .to("file:C:/Users/290577/Desktop/Task/my-cart/target/output?fileName=${header.CamelFileName}&fileExist=Override")
                     .log("XML file created successfully: ${header.CamelFileName}")
+                    .stop();
+
+            from("direct:getItemReviews")
+                    .routeId("itemReviewsRoute")
+                    .setHeader(MongoDbConstants.OPERATION_HEADER, constant("findAll"))
+                    .to("mongodb:myMongoBean?database=cart&collection=item&operation=findAll")
+                    .process(exchange -> {
+                        List<Document> docs = exchange.getIn().getBody(List.class);
+                        List<Map<String, Object>> items = new ArrayList<>();
+                        for (Document doc : docs) {
+                            Map<String, Object> itemMap = new HashMap<>();
+                            itemMap.put("itemId", doc.getString("_id"));
+                            List<Map<String, Object>> reviews = new ArrayList<>();
+                            List<Document> reviewDocs = (List<Document>) doc.get("review");
+                            if (reviewDocs != null) {
+                                for (Document review : reviewDocs) {
+                                    Map<String, Object> reviewMap = new HashMap<>();
+                                    reviewMap.put("reviewrating", review.getString("rating"));
+                                    reviewMap.put("reviewcomment", review.getString("comment"));
+                                    reviews.add(reviewMap);
+                                }
+                            }
+                            itemMap.put("items", reviews);
+                            items.add(itemMap);
+                        }
+                        exchange.getIn().setBody(items);
+                        String fileName = "reviews_" + System.currentTimeMillis() + ".xml";
+                        exchange.getIn().setHeader("CamelFileName", fileName);
+                    })
+                    .to("velocity:file:src/main/resources/templates/review-template.vm")
+                    .to("file:C:/Users/290577/Desktop/Task/my-cart/target/output?fileName=${header.CamelFileName}&fileExist=Override")
+                    .log("Review XML file created successfully: ${header.CamelFileName}")
                     .stop();
         }
     }

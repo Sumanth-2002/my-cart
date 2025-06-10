@@ -74,6 +74,7 @@
 			<artifactId>camel-mongodb-starter</artifactId>
 			<version>${camel.version}</version>
 		</dependency>
+
 	</dependencies>
 
 	<build>

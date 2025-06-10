@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="utf-8"?>
+
+<Reviews xsi:noNamespaceSchemaLocation="schema.xsd" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
+  #foreach($entry in $body)
+    <item id="$!{entry.itemId}">
+      #foreach($item in $entry.items)
+        <Review>
+          <reviewrating>$!{item.reviewrating}</reviewrating>
+          <reviewcomment>$!{item.reviewcomment}</reviewcomment>
+        </Review>
+      #end
+    </item>
+  #end
+</Reviews>
