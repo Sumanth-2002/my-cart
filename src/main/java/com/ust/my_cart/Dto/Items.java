@@ -2,11 +2,10 @@ package com.ust.my_cart.Dto;
 
 public class Items {
     private String itemId;
-    private Object sellingPrice; // Using Object to handle both Integer and Double from MongoDB
-    private Object availableStock; // Using Object for flexibility
+    private Object sellingPrice;
+    private Object availableStock;
     private String categoryId;
 
-    // Default constructor (required for Jackson)
     public Items() {
     }
 
