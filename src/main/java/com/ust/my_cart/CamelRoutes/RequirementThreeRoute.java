@@ -142,7 +142,7 @@ public class RequirementThreeRoute extends RouteBuilder {
                             items.add(itemMap);
                         }
                         exchange.getIn().setBody(items);
-                        String fileName = "reviews_" + System.currentTimeMillis() + ".xml";
+                        String fileName = "reviews.xml";
                         exchange.getIn().setHeader("CamelFileName", fileName);
                     })
                     .to("velocity:file:src/main/resources/templates/review-template.vm")
