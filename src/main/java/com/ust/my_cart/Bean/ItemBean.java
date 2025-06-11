@@ -108,6 +108,32 @@ public class ItemBean {
         exchange.setProperty("categoryId", categoryId);
     }
 
+    public void mapCategoryDetailss(Exchange exchange) {
+        Document categoryDoc = exchange.getIn().getBody(Document.class); // Category Document
+        Document item = exchange.getProperty("currentItem", Document.class); // Retrieve item Document
+        if (categoryDoc == null) {
+            throw new ProcessException("CategoryId not found", 404);
+        }
+        if (item == null) {
+            throw new ProcessException("Item Document not found", 500);
+        }
+        String categoryName = categoryDoc.getString("categoryName");
+        String categoryDep = categoryDoc.getString("categoryDep");
+        String categoryId = categoryDoc.getString("_id");
+
+        // Add category details to item Document
+        item.put("categoryName", categoryName);
+        item.put("categoryDep", categoryDep);
+
+        // Set exchange properties (for compatibility with findItemsByCategoryIdResponses)
+        exchange.setProperty("categoryName", categoryName);
+        exchange.setProperty("categoryDep", categoryDep);
+        exchange.setProperty("categoryId", categoryId);
+
+        // Set item Document as body
+        exchange.getIn().setBody(item);
+    }
+
     public void validateInventoryUpdates(Exchange exchange) {
         Map<String, Object> payload = exchange.getIn().getBody(Map.class);
         List<Map<String, Object>> items = (List<Map<String, Object>>) payload.get("items");

@@ -138,14 +138,6 @@ public class RequirementOneRoute extends RouteBuilder {
                 .bean(responseHelper, "prepareInventoryUpdateResponse")
                 .log("Returning response: ${body}");
 
-        from("direct:findAllItemsAndSaveToFile")
-                .routeId("findAllItemsAndSaveToFileRoute")
-                .to("mongodb:myMongoBean?database=cart&collection=item&operation=findAll")
-                .bean(responseHelper, "findItemsByCategoryIdResponse")
-                .marshal().json(JsonLibrary.Jackson)
-                .to("file:target/output?fileName=allItems.json&fileExist=Override")
-                .log("All items saved to file: allItems.json");
-
     }
 }
 
